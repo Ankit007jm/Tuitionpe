@@ -17,6 +17,8 @@ class Config:
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + DB_PATH
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Reconnect if a pooled connection has gone stale (fixes Neon SSL errors)
+    SQLALCHEMY_ENGINE_OPTIONS = {'pool_pre_ping': True}
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5MB max upload
 

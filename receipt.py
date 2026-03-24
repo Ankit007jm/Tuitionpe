@@ -348,7 +348,7 @@ def generate_receipt_pdf(tutor, student, payment):
     if HAS_FPDF:
         pdf = ReceiptPDF(tutor, student, payment)
         pdf.build()
-        return pdf.output()
+        return bytes(pdf.output())  # fpdf2 returns bytearray; gunicorn needs bytes
     else:
         return _generate_minimal_pdf(tutor, student, payment)
 
