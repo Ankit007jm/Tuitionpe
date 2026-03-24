@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Verify OTP{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-8 grid-bg relative z-10">
+    <div class="w-full auth-container mx-auto">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text gradient-accent mb-2">TuitionPe</h1>
+            <p class="text-gray-500">Verify your identity</p>
+        </div>
+
+        <!-- Card -->
+        <div class="card-dark rounded-3xl p-7">
+            <!-- Icon -->
+            <div class="flex justify-center mb-4">
+                <div class="w-14 h-14 gradient-green rounded-2xl flex items-center justify-center">
+                    <i class="fas fa-envelope-open-text text-xl"></i>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-bold text-center mb-1">Check Your Email</h2>
+            <p class="text-gray-500 text-sm text-center mb-6">We've sent a 6-digit OTP to your email. Enter it below to verify your identity.</p>
+
+            <form method="POST" action="{{ url_for('auth.verify_otp') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="mb-5">
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Enter OTP</label>
+                    <input type="text" name="otp" placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                           class="w-full input-dark rounded-xl py-4 px-4 text-white text-center text-2xl font-bold tracking-widest placeholder-gray-600"
+                           style="letter-spacing: 8px;" required autofocus>
+                    <p class="text-gray-600 text-xs mt-2 text-center">OTP expires in 10 minutes</p>
+                </div>
+
+                <button type="submit" class="w-full btn-primary text-white py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2">
+                    <i class="fas fa-check-circle text-sm"></i> Verify OTP
+                </button>
+            </form>
+
+            <!-- Resend OTP -->
+            <div class="text-center mt-5">
+                <p class="text-gray-500 text-sm mb-2">Didn't receive the OTP?</p>
+                <form method="POST" action="{{ url_for('auth.resend_otp') }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="text-emerald-500 font-medium text-sm hover:underline">
+                        <i class="fas fa-redo text-xs mr-1"></i> Resend OTP
+                    </button>
+                </form>
+            </div>
+
+            <p class="text-center mt-4 text-gray-500 text-sm">
+                <a href="{{ url_for('auth.forgot_password') }}" class="text-gray-400 hover:text-emerald-500 transition-colors">
+                    <i class="fas fa-arrow-left text-xs mr-1"></i> Try different email
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

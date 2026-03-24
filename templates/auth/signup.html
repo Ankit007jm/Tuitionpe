@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% block title %}Create Account{% endblock %}
+
+{% block content %}
+<div class="min-h-screen px-4 py-6 grid-bg relative z-10">
+    <div class="w-full auth-container mx-auto">
+        <!-- Header -->
+        <div class="flex items-center gap-3 mb-6">
+            <a href="{{ url_for('auth.login') }}" class="w-11 h-11 rounded-xl border border-white/10 flex items-center justify-center hover:border-accent/50 hover:bg-white/5 transition-all">
+                <i class="fas fa-arrow-left text-gray-400"></i>
+            </a>
+            <div>
+                <h1 class="text-xl font-bold">Create Account</h1>
+                <p class="text-gray-500 text-sm">Setup your tutor profile</p>
+            </div>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="flex items-center justify-center gap-2 mb-6">
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-full gradient-accent flex items-center justify-center text-sm font-bold transition-all" id="step1Indicator">1</div>
+                <span class="text-xs text-accent font-medium" id="step1Label">Basic</span>
+            </div>
+            <div class="w-10 h-0.5 bg-white/20 rounded transition-all" id="line1"></div>
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-gray-500 transition-all" id="step2Indicator">2</div>
+                <span class="text-xs text-gray-500 transition-all" id="step2Label">Teaching</span>
+            </div>
+            <div class="w-10 h-0.5 bg-white/20 rounded transition-all" id="line2"></div>
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-gray-500 transition-all" id="step3Indicator">3</div>
+                <span class="text-xs text-gray-500 transition-all" id="step3Label">Payment</span>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.signup') }}" enctype="multipart/form-data" id="signupForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="subjects" id="subjectsHidden" value="">
+            <input type="hidden" name="classes_taught" id="classesHidden" value="">
+
+            <!-- Step 1: Basic Info -->
+            <div id="signupStep1" class="card-dark rounded-3xl p-6">
+                <h3 class="font-semibold mb-5 flex items-center gap-2">
+                    <i class="fas fa-user text-accent"></i> Basic Information
+                </h3>
+
+                <!-- Avatar Upload -->
+                <div class="flex justify-center mb-5">
+                    <div class="relative group">
+                        <div class="w-24 h-24 gradient-accent rounded-2xl flex items-center justify-center avatar cursor-pointer transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-accent/30" id="signupAvatarPreview" onclick="document.getElementById('signupAvatarInput').click()">
+                            <i class="fas fa-user text-3xl opacity-70"></i>
+                        </div>
+                        <input type="file" id="signupAvatarInput" name="profile_image" class="hidden" accept="image/*" onchange="previewSignupAvatar(this)">
+                        <label for="signupAvatarInput" class="absolute -bottom-1 -right-1 w-8 h-8 gradient-accent rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition shadow-lg">
+                            <i class="fas fa-camera text-xs"></i>
+                        </label>
+                    </div>
+                </div>
+                <p class="text-center text-gray-500 text-xs mb-5">Tap to add profile photo</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Full Name *</label>
+                        <input type="text" id="signupName" name="name" placeholder="Enter your full name" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600" required oninput="updateSignupInitials()">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Phone Number *</label>
+                        <div class="flex phone-group">
+                            <span class="phone-prefix">+91</span>
+                            <input type="tel" id="signupPhone" name="phone" placeholder="10-digit number" class="phone-input" maxlength="10" required>
+                        </div>
+                        <p class="text-gray-600 text-xs mt-1.5"><i class="fas fa-info-circle mr-1"></i>Used for login</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Email Address</label>
+                        <input type="email" name="email" placeholder="your@email.com" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
+                        <p class="text-accent/70 text-xs mt-1.5"><i class="fas fa-shield-alt mr-1"></i>Required for password recovery</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Password *</label>
+                        <div class="relative">
+                            <input type="password" id="signupPass" name="password" placeholder="Min 6 characters" class="w-full input-dark rounded-xl py-3 px-4 pr-12 text-white placeholder-gray-600" required>
+                            <button type="button" onclick="togglePass('signupPass','signupEye')" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-accent transition-colors">
+                                <i class="fas fa-eye" id="signupEye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Confirm Password *</label>
+                        <input type="password" id="signupConfirmPass" name="confirm_password" placeholder="Re-enter password" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600" required>
+                    </div>
+                </div>
+
+                <button type="button" onclick="goToSignupStep(2)" class="w-full btn-primary py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 mt-6">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <!-- Step 2: Teaching Details -->
+            <div id="signupStep2" class="card-dark rounded-3xl p-6 hidden" style="display:none;">
+                <h3 class="font-semibold mb-5 flex items-center gap-2">
+                    <i class="fas fa-chalkboard-teacher text-accent"></i> Teaching Details
+                </h3>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-3 font-medium">Subjects You Teach *</label>
+                        <div class="flex flex-wrap gap-2">
+                            {% for subj in ['Physics', 'Maths', 'Chemistry', 'Biology', 'English', 'Hindi', 'Other'] %}
+                            <label class="cursor-pointer"><input type="checkbox" class="hidden peer" name="subjects" value="{{ subj }}"><span class="px-4 py-2 rounded-xl border border-white/10 text-sm text-gray-400 peer-checked:border-accent peer-checked:text-accent peer-checked:bg-accent/10 inline-block transition-all hover:border-white/30">{{ subj }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-3 font-medium">Classes You Teach</label>
+                        <div class="flex flex-wrap gap-2">
+                            {% for cls in ['6-8', '9-10', '11-12', 'College'] %}
+                            <label class="cursor-pointer"><input type="checkbox" class="hidden peer" name="classes" value="{{ cls }}"><span class="px-4 py-2 rounded-xl border border-white/10 text-sm text-gray-400 peer-checked:border-accent peer-checked:text-accent peer-checked:bg-accent/10 inline-block transition-all hover:border-white/30">{{ cls }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Experience (Years)</label>
+                            <input type="number" name="experience" placeholder="e.g., 5" min="0" max="50" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Qualification</label>
+                            <select name="qualification" class="w-full input-dark rounded-xl py-3 px-4 text-white">
+                                <option value="">Select</option>
+                                {% for q in ['B.Sc', 'M.Sc', 'B.Tech', 'M.Tech', 'B.Ed', 'PhD'] %}
+                                <option value="{{ q }}">{{ q }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">About You</label>
+                        <textarea name="bio" placeholder="Brief introduction..." rows="3" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600 resize-none"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="goToSignupStep(1)" class="flex-1 card-dark py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button type="button" onclick="goToSignupStep(3)" class="flex-1 btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Payment Details -->
+            <div id="signupStep3" class="card-dark rounded-3xl p-6 hidden" style="display:none;">
+                <h3 class="font-semibold mb-2 flex items-center gap-2">
+                    <i class="fas fa-credit-card text-accent"></i> Payment Details
+                </h3>
+                <p class="text-gray-500 text-sm mb-5">For receiving fee payments from parents</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">UPI ID</label>
+                        <input type="text" name="upi_id" placeholder="yourname@paytm" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Payment QR Code</label>
+                        <div class="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-accent/30 transition-all cursor-pointer group" onclick="document.getElementById('signupQRInput').click()">
+                            <div id="qrPreview">
+                                <i class="fas fa-qrcode text-4xl text-gray-600 mb-2 group-hover:text-accent group-hover:scale-110 transition-all"></i>
+                                <p class="text-gray-500 text-sm">Upload QR code image</p>
+                                <p class="text-gray-600 text-xs mt-1">PNG, JPG up to 2MB</p>
+                            </div>
+                            <input type="file" id="signupQRInput" name="qr_image" class="hidden" accept="image/*" onchange="previewQR(this)">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Bank Account</label>
+                            <input type="text" name="bank_account" placeholder="Account number" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">IFSC Code</label>
+                            <input type="text" name="ifsc_code" placeholder="IFSC code" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="goToSignupStep(2)" class="flex-1 card-dark py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button type="button" onclick="handleSignup(event)" class="flex-1 btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                        Create Account <i class="fas fa-check"></i>
+                    </button>
+                </div>
+
+                <p class="text-center text-gray-500 text-xs mt-4">
+                    <i class="fas fa-info-circle mr-1"></i>You can add payment details later in Settings
+                </p>
+            </div>
+        </form>
+
+        <p class="text-center mt-5 text-gray-500 text-sm">
+            Already have an account? <a href="{{ url_for('auth.login') }}" class="text-accent font-medium hover:underline">Sign in</a>
+        </p>
+    </div>
+</div>
+
+<script>
+let currentSignupStep = 1;
+
+function goToSignupStep(step) {
+    const step1 = document.getElementById('signupStep1');
+    const step2 = document.getElementById('signupStep2');
+    const step3 = document.getElementById('signupStep3');
+
+    // Validate current step before moving forward
+    if (currentSignupStep === 1 && step > 1) {
+        const name = document.getElementById('signupName');
+        const phone = document.getElementById('signupPhone');
+        const password = document.getElementById('signupPass');
+        const confirm = document.getElementById('signupConfirmPass');
+
+        if (!name || !name.value.trim() || name.value.trim().length < 2) {
+            showToast('Name must be at least 2 characters.', 'error');
+            return;
+        }
+        if (!phone || phone.value.length !== 10) {
+            showToast('Enter a valid 10-digit phone number.', 'error');
+            return;
+        }
+        if (!password || password.value.length < 6) {
+            showToast('Password must be at least 6 characters.', 'error');
+            return;
+        }
+        if (!confirm || password.value !== confirm.value) {
+            showToast('Passwords do not match.', 'error');
+            return;
+        }
+    }
+
+    if (currentSignupStep === 2 && step > 2) {
+        const checked = document.querySelectorAll('input[name="subjects"]:checked');
+        if (checked.length === 0) {
+            showToast('Please select at least one subject.', 'error');
+            return;
+        }
+    }
+
+    // Hide current step
+    if (currentSignupStep === 1) step1.style.display = 'none';
+    if (currentSignupStep === 2) step2.style.display = 'none';
+    if (currentSignupStep === 3) step3.style.display = 'none';
+
+    // Show new step
+    if (step === 1) step1.style.display = 'block';
+    if (step === 2) step2.style.display = 'block';
+    if (step === 3) step3.style.display = 'block';
+
+    currentSignupStep = step;
+    updateSignupStepIndicators();
+}
+
+function updateSignupStepIndicators() {
+    for (let i = 1; i <= 3; i++) {
+        const indicator = document.getElementById('step' + i + 'Indicator');
+        const label = document.getElementById('step' + i + 'Label');
+        const line = document.getElementById('line' + (i - 1));
+
+        if (!indicator) continue;
+
+        indicator.className = '';
+        if (i < currentSignupStep) {
+            indicator.classList.add('w-9', 'h-9', 'rounded-full', 'gradient-accent', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-bold', 'transition-all');
+            indicator.innerHTML = '<i class="fas fa-check text-xs"></i>';
+        } else if (i === currentSignupStep) {
+            indicator.classList.add('w-9', 'h-9', 'rounded-full', 'gradient-accent', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-bold', 'transition-all');
+            indicator.textContent = i;
+        } else {
+            indicator.classList.add('w-9', 'h-9', 'rounded-full', 'bg-white/10', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-bold', 'text-gray-500', 'transition-all');
+            indicator.textContent = i;
+        }
+
+        if (label) {
+            label.style.color = i <= currentSignupStep ? '#10b981' : '#6b7280';
+        }
+    }
+}
+
+function previewSignupAvatar(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('signupAvatarPreview').innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover rounded-2xl">';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function previewQR(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('qrPreview').innerHTML = '<img src="' + e.target.result + '" class="max-h-32 mx-auto rounded-lg">';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function updateSignupInitials() {
+    const name = document.getElementById('signupName').value;
+    const initials = getInitials(name);
+    document.getElementById('signupAvatarPreview').textContent = initials || 'TP';
+}
+
+function handleSignup(event) {
+    event.preventDefault();
+    const form = document.getElementById('signupForm');
+    if (form) {
+        // Gather subjects
+        const subjects = [];
+        document.querySelectorAll('input[name="subjects"]:checked').forEach(cb => {
+            subjects.push(cb.value);
+        });
+        document.getElementById('subjectsHidden').value = subjects.join(',');
+
+        // Gather classes
+        const classes = [];
+        document.querySelectorAll('input[name="classes"]:checked').forEach(cb => {
+            classes.push(cb.value);
+        });
+        document.getElementById('classesHidden').value = classes.join(',');
+
+        form.submit();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        document.querySelectorAll('.reveal').forEach(el => {
+            el.classList.add('active');
+        });
+    }, 100);
+});
+</script>
+{% endblock %}

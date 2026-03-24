@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Students{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <p class="text-gray-500 text-sm">My Students</p>
+            <h1 class="text-2xl font-bold mt-1">Students</h1>
+        </div>
+        <a href="{{ url_for('students.add_student') }}" class="btn-primary px-4 py-2 rounded-xl text-sm font-semibold">
+            <i class="fas fa-plus mr-1"></i> Add
+        </a>
+    </div>
+
+    <!-- Search -->
+    <div class="mb-4">
+        <div class="relative">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+            <input type="text" id="studentSearch" placeholder="Search students..." value="{{ search }}"
+                   class="w-full input-dark rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-600 text-sm"
+                   oninput="debounceSearch()">
+        </div>
+    </div>
+
+    <!-- Filter Tabs - Pill Style -->
+    <div class="flex gap-2 mb-5 overflow-x-auto pb-2">
+        <a href="{{ url_for('students.student_list', filter='all') }}"
+           class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all {{ 'btn-primary' if filter_type == 'all' and not show_archived else 'card-dark text-gray-400 hover:text-white hover:border-accent/30' }}">
+            All ({{ total }})
+        </a>
+        <a href="{{ url_for('students.student_list', filter='regular') }}"
+           class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all {{ 'btn-primary' if filter_type == 'regular' else 'card-dark text-gray-400 hover:text-white hover:border-accent/30' }}">
+            Regular ({{ regular_count }})
+        </a>
+        <a href="{{ url_for('students.student_list', filter='exam') }}"
+           class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all {{ 'btn-primary' if filter_type == 'exam' else 'card-dark text-gray-400 hover:text-white hover:border-accent/30' }}">
+            Exam ({{ exam_count }})
+        </a>
+        {% if archived_count > 0 %}
+        <a href="{{ url_for('students.student_list', archived='1') }}"
+           class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all {{ 'btn-primary' if show_archived else 'card-dark text-gray-400 hover:text-white hover:border-accent/30' }}">
+            <i class="fas fa-archive mr-1"></i> Archived ({{ archived_count }})
+        </a>
+        {% endif %}
+    </div>
+
+    {% if show_archived %}
+    <div class="card-dark rounded-xl p-3 mb-4 border border-yellow-500/20">
+        <p class="text-yellow-400 text-xs"><i class="fas fa-info-circle mr-1"></i> Showing archived students. These students are inactive but their data is preserved.</p>
+    </div>
+    {% endif %}
+
+    <!-- Student Cards -->
+    {% if student_data %}
+    <div class="space-y-3">
+        {% for item in student_data %}
+        {% set s = item.student %}
+        {% set status = item.fee_status %}
+        <div class="card-dark rounded-2xl p-4 {{ 'opacity-70' if show_archived else '' }}">
+            <div class="flex items-center gap-3 mb-3">
+                {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange', 'gradient-green'] %}
+                <div class="w-11 h-11 {{ gradients[loop.index0 % 6] }} rounded-xl flex items-center justify-center avatar text-sm font-bold">
+                    {{ s.student_name.split()[0][0] }}{{ s.student_name.split()[-1][0] if s.student_name.split()|length > 1 else '' }}
+                </div>
+                <div class="flex-1">
+                    <div class="font-medium">{{ s.student_name }}</div>
+                    <div class="text-gray-500 text-xs">Class {{ s.class_grade }} - {{ s.subject }}</div>
+                </div>
+                {% if not show_archived %}
+                <span class="badge badge-{{ status }}">
+                    {{ 'Paid' if status == 'paid' else ('Pending' if status == 'pending' else 'Overdue') }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="flex items-center justify-between pt-3 border-t border-white/5">
+                <div class="text-sm">
+                    <span class="text-accent font-semibold">₹{{ s.fee_amount|int }}</span>
+                    <span class="text-gray-500">/{{ s.payment_cycle }}</span>
+                </div>
+                <div class="flex gap-2">
+                    {% if show_archived %}
+                    <!-- Restore button for archived students -->
+                    <form method="POST" action="{{ url_for('students.restore_student', id=s.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:rgba(16,185,129,0.15);" title="Restore Student">
+                            <i class="fas fa-undo text-xs" style="color:#10b981;"></i>
+                        </button>
+                    </form>
+                    <!-- Permanent delete -->
+                    <form method="POST" action="{{ url_for('students.permanently_delete_student', id=s.id) }}"
+                          onsubmit="return confirm('PERMANENTLY delete {{ s.student_name }} and ALL their payment records, schedules, and attendance data? This cannot be undone.');" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:rgba(239,68,68,0.15);" title="Permanently Delete">
+                            <i class="fas fa-trash text-xs text-red-400"></i>
+                        </button>
+                    </form>
+                    {% else %}
+                    <a href="{{ url_for('students.edit_student', id=s.id) }}" class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-accent/30 transition-all">
+                        <i class="fas fa-pen text-xs text-gray-400"></i>
+                    </a>
+                    <a href="{{ url_for('fees.payment_history', student_id=s.id) }}" class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-accent/30 transition-all" title="Payment History">
+                        <i class="fas fa-history text-xs text-gray-400"></i>
+                    </a>
+                    <a href="{{ url_for('fees.remind', student_id=s.id) }}" target="_blank" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:rgba(16,185,129,0.15);">
+                        <i class="fab fa-whatsapp text-sm" style="color:#10b981;"></i>
+                    </a>
+                    <form method="POST" action="{{ url_for('students.delete_student', id=s.id) }}"
+                          onsubmit="return confirm('Archive {{ s.student_name }}? They will be moved to the archived list.');" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-red-500/30 transition-all" title="Archive Student">
+                            <i class="fas fa-archive text-xs text-gray-500"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-dark rounded-2xl p-8 text-center">
+        <i class="fas fa-user-graduate text-3xl text-gray-600 mb-3"></i>
+        {% if show_archived %}
+        <p class="text-gray-400 font-medium mb-1">No archived students</p>
+        {% else %}
+        <p class="text-gray-400 font-medium mb-1">No students found</p>
+        <p class="text-gray-600 text-sm mb-4">Add your first student to get started</p>
+        <a href="{{ url_for('students.add_student') }}" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold">
+            <i class="fas fa-plus mr-1"></i> Add Student
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}

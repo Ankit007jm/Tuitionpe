@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Fees{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <p class="text-gray-500 text-sm">Fee Analytics</p>
+            <h1 class="text-2xl font-bold mt-1">Payments</h1>
+        </div>
+        <!-- Month Selector -->
+        <form method="GET" action="{{ url_for('fees.fees') }}" class="flex items-center">
+            <input type="month" name="month" value="{{ selected_month }}"
+                   class="input-dark rounded-xl py-2.5 px-3 text-sm text-white" onchange="this.form.submit()">
+        </form>
+    </div>
+
+    <!-- Month Display -->
+    <div class="text-center mb-6">
+        <h2 class="text-lg font-bold">{{ month_display }}</h2>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-3 gap-3 mb-6">
+        <div class="card-dark rounded-2xl p-4 text-center">
+            <div class="w-10 h-10 gradient-accent rounded-xl flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-check text-xs"></i>
+            </div>
+            <div class="text-lg font-bold text-accent">₹<span class="count-up" data-target="{{ collected|int }}">{{ collected|int }}</span></div>
+            <div class="text-gray-500 text-xs">Collected</div>
+        </div>
+        <div class="card-dark rounded-2xl p-4 text-center">
+            <div class="w-10 h-10 gradient-orange rounded-xl flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-clock text-xs"></i>
+            </div>
+            <div class="text-lg font-bold text-orange-400">₹<span class="count-up" data-target="{{ pending|int }}">{{ pending|int }}</span></div>
+            <div class="text-gray-500 text-xs">Pending</div>
+        </div>
+        <div class="card-dark rounded-2xl p-4 text-center">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style="background:linear-gradient(135deg,#ef4444,#dc2626);">
+                <i class="fas fa-exclamation text-xs"></i>
+            </div>
+            <div class="text-lg font-bold text-red-400">₹<span class="count-up" data-target="{{ overdue|int }}">{{ overdue|int }}</span></div>
+            <div class="text-gray-500 text-xs">Overdue</div>
+        </div>
+    </div>
+
+    <!-- Pie Chart -->
+    <div class="card-dark rounded-2xl p-4 mb-6">
+        <h3 class="font-semibold text-sm mb-3 text-center">Fee Breakdown</h3>
+        <div style="height: 200px;">
+            <canvas id="feesPieChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Bulk Actions -->
+    {% set unpaid_payments = payment_data|selectattr('payment.status', 'ne', 'paid')|list %}
+    {% if unpaid_payments %}
+    <form method="POST" action="{{ url_for('fees.bulk_mark_paid') }}" id="bulkForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <label class="cursor-pointer flex items-center gap-2">
+                    <input type="checkbox" id="selectAll" class="w-4 h-4 accent-emerald-500" onchange="toggleAllPayments(this)">
+                    <span class="text-gray-400 text-xs">Select All Unpaid</span>
+                </label>
+            </div>
+            <button type="submit" id="bulkPayBtn" class="hidden px-4 py-2 rounded-xl text-xs font-semibold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-all">
+                <i class="fas fa-check-double mr-1"></i> Mark Selected Paid
+            </button>
+        </div>
+    {% endif %}
+
+    <!-- Payment List -->
+    <h3 class="font-semibold text-sm mb-3">Payment Details</h3>
+    {% if payment_data %}
+    <div class="space-y-3">
+        {% for item in payment_data %}
+        {% set p = item.payment %}
+        {% set s = item.student %}
+        <div class="card-dark rounded-2xl p-4 border-status-{{ p.status }}">
+            <div class="flex items-center gap-3 mb-3">
+                {% if p.status != 'paid' %}
+                <input type="checkbox" name="payment_ids" value="{{ p.id }}" form="bulkForm"
+                       class="bulk-checkbox w-4 h-4 accent-emerald-500 flex-shrink-0" onchange="updateBulkBtn()">
+                {% endif %}
+                {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange', 'gradient-green'] %}
+                <div class="w-10 h-10 {{ gradients[loop.index0 % 6] }} rounded-xl flex items-center justify-center avatar text-sm font-bold">
+                    {{ item.initials }}
+                </div>
+                <div class="flex-1">
+                    <a href="{{ url_for('fees.payment_history', student_id=s.id) }}" class="font-medium text-sm hover:text-accent transition-colors">{{ s.student_name }}</a>
+                    <div class="text-gray-500 text-xs">
+                        {% if p.status == 'paid' %}
+                        Paid on {{ p.paid_date.strftime('%d %b %Y') if p.paid_date else 'N/A' }}
+                        {% elif p.status == 'overdue' %}
+                        <span class="text-red-400">Overdue{% if p.due_date %} (Due: {{ p.due_date.strftime('%d %b') }}){% endif %}</span>
+                        {% else %}
+                        <span class="text-orange-400">Payment pending{% if p.due_date %} (Due: {{ p.due_date.strftime('%d %b') }}){% endif %}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="font-bold text-sm">₹{{ p.amount|int }}</div>
+                    <span class="badge badge-{{ p.status }}">{{ p.status|capitalize }}</span>
+                </div>
+            </div>
+
+            {% if p.status != 'paid' %}
+            <div class="flex gap-2 pt-3 border-t border-white/5">
+                <form method="POST" action="{{ url_for('fees.mark_paid', id=p.id) }}" class="flex-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="w-full btn-primary py-2.5 rounded-xl text-xs font-semibold">
+                        <i class="fas fa-check mr-1"></i> Mark Paid
+                    </button>
+                </form>
+                <a href="{{ url_for('fees.remind', student_id=s.id) }}" target="_blank"
+                   class="flex-1 py-2.5 rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1 transition-all hover:opacity-80"
+                   style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                    <i class="fab fa-whatsapp"></i> Remind
+                </a>
+            </div>
+            {% else %}
+            <!-- Send Receipt + Undo -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;" class="pt-3 border-t border-white/5">
+                <a href="{{ url_for('fees.receipt_options', id=p.id) }}"
+                   class="py-2.5 rounded-xl text-xs font-semibold text-center transition-all hover:opacity-80 flex items-center justify-center gap-1"
+                   style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                    <i class="fas fa-receipt"></i> Send Receipt
+                </a>
+                <form method="POST" action="{{ url_for('fees.mark_unpaid', id=p.id) }}"
+                      onsubmit="return confirm('Revert this payment to pending?');" style="display:contents;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="py-2.5 rounded-xl text-xs font-semibold text-center transition-all hover:opacity-80"
+                            style="background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.25); width:100%;">
+                        <i class="fas fa-undo mr-1"></i> Undo
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if unpaid_payments %}
+    </form>
+    {% endif %}
+
+    {% else %}
+    <div class="card-dark rounded-2xl p-8 text-center">
+        <i class="fas fa-receipt text-3xl text-gray-600 mb-3"></i>
+        <p class="text-gray-400 font-medium">No payment records for this month</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initFeesPieChart({{ collected }}, {{ pending }}, {{ overdue }});
+
+    // Animate count-up values
+    const countUps = document.querySelectorAll('.count-up');
+    countUps.forEach(el => {
+        const target = parseInt(el.dataset.target) || 0;
+        animateCountUp(el, target, 1500);
+    });
+});
+
+function toggleAllPayments(selectAllEl) {
+    document.querySelectorAll('.bulk-checkbox').forEach(cb => {
+        cb.checked = selectAllEl.checked;
+    });
+    updateBulkBtn();
+}
+
+function updateBulkBtn() {
+    const checked = document.querySelectorAll('.bulk-checkbox:checked').length;
+    const btn = document.getElementById('bulkPayBtn');
+    if (btn) {
+        btn.classList.toggle('hidden', checked === 0);
+        if (checked > 0) {
+            btn.innerHTML = '<i class="fas fa-check-double mr-1"></i> Mark ' + checked + ' Paid';
+        }
+    }
+}
+</script>
+{% endblock %}

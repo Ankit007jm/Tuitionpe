@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Send Receipt{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Back -->
+    <a href="{{ url_for('fees.fees') }}" class="inline-flex items-center gap-2 text-gray-400 text-sm mb-6 hover:text-accent transition-colors">
+        <i class="fas fa-arrow-left"></i> Back to Fees
+    </a>
+
+    <!-- Success Banner -->
+    <div class="card-dark rounded-2xl p-5 mb-6 border border-accent/30" style="background:rgba(16,185,129,0.08);">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="w-12 h-12 gradient-accent rounded-xl flex items-center justify-center">
+                <i class="fas fa-check text-xl"></i>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-accent">Payment Recorded!</h2>
+                <p class="text-gray-400 text-sm">{{ student.student_name }} — Rs.{{ payment.amount|int }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Summary -->
+    <div class="card-dark rounded-2xl p-5 mb-6">
+        <h3 class="font-semibold text-sm mb-4 text-gray-400 uppercase tracking-wider">Receipt Summary</h3>
+        <div class="space-y-3">
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Receipt No.</span>
+                <span class="text-white text-sm font-semibold">TP-{{ '%06d' % payment.id }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Student</span>
+                <span class="text-white text-sm font-semibold">{{ student.student_name }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Month</span>
+                <span class="text-white text-sm font-semibold">{{ month_display }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Amount</span>
+                <span class="text-accent text-lg font-bold">Rs. {{ payment.amount|int }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Status</span>
+                <span class="badge badge-paid">PAID</span>
+            </div>
+            {% if payment.paid_date %}
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Paid On</span>
+                <span class="text-white text-sm font-semibold">{{ payment.paid_date.strftime('%d %b %Y') }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Send Options -->
+    <h3 class="font-semibold text-sm mb-4 text-gray-400 uppercase tracking-wider">Send Receipt</h3>
+    <div class="space-y-3">
+        <!-- Email Option -->
+        <form method="POST" action="{{ url_for('fees.send_receipt_email_route', id=payment.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all text-left">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">
+                    <i class="fas fa-envelope text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="font-semibold text-sm">Send via Email</div>
+                    <div class="text-gray-500 text-xs mt-0.5">
+                        {% if current_user.email %}
+                        Receipt PDF will be sent to {{ current_user.email }}
+                        {% else %}
+                        <span class="text-red-400">Email not set — update in Profile first</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <i class="fas fa-chevron-right text-gray-600"></i>
+            </button>
+        </form>
+
+        <!-- WhatsApp Option -->
+        <a href="{{ url_for('fees.send_receipt_whatsapp', id=payment.id) }}" target="_blank"
+           class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all block">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#22c55e,#16a34a);">
+                <i class="fab fa-whatsapp text-xl"></i>
+            </div>
+            <div class="flex-1">
+                <div class="font-semibold text-sm">Send via WhatsApp</div>
+                <div class="text-gray-500 text-xs mt-0.5">Send receipt details with download link to parent</div>
+            </div>
+            <i class="fas fa-chevron-right text-gray-600"></i>
+        </a>
+
+        <!-- Download PDF -->
+        <a href="{{ url_for('fees.download_receipt', id=payment.id) }}"
+           class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all block">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#a855f7,#7c3aed);">
+                <i class="fas fa-file-pdf text-lg"></i>
+            </div>
+            <div class="flex-1">
+                <div class="font-semibold text-sm">Download PDF</div>
+                <div class="text-gray-500 text-xs mt-0.5">Save receipt as PDF to your device</div>
+            </div>
+            <i class="fas fa-chevron-right text-gray-600"></i>
+        </a>
+    </div>
+
+    <!-- Skip -->
+    <div class="mt-6 text-center">
+        <a href="{{ url_for('fees.fees', month=payment.month_year[:7]) }}" class="text-gray-500 text-sm hover:text-gray-300 transition-colors">
+            Skip — Go back to Fees <i class="fas fa-arrow-right ml-1"></i>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}

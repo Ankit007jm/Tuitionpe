@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuitionPe - {% block title %}Manage Your Tuition Business{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: {
+                        dark: { 900: '#050505', 800: '#0a0a0a', 700: '#121212', 600: '#1a1a1a', 500: '#222222' },
+                        accent: { DEFAULT: '#10b981', light: '#34d399', dark: '#059669' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen text-white bg-dark-900">
+    <!-- Loading Screen — only on first visit per session -->
+    <div class="loading-screen" id="loading" style="display:none;">
+        <div class="loader-ring"></div>
+        <p class="loading-text">TUITIONPE</p>
+    </div>
+    <script>
+        (function() {
+            if (!sessionStorage.getItem('tp_loaded')) {
+                document.getElementById('loading').style.display = '';
+            }
+        })();
+    </script>
+
+    <!-- Twinkling Stars Background -->
+    <div class="stars-bg" id="starsBg">
+        <!-- Green glow orbs for ambient light -->
+        <div class="glow-orb" style="width:400px;height:400px;background:#10b981;top:-100px;right:-100px;"></div>
+        <div class="glow-orb" style="width:300px;height:300px;background:#059669;bottom:10%;left:-80px;"></div>
+        <div class="glow-orb" style="width:200px;height:200px;background:#10b981;top:50%;right:20%;"></div>
+    </div>
+    <script>
+        // Generate twinkling stars dynamically
+        (function() {
+            var bg = document.getElementById('starsBg');
+            if (!bg) return;
+            for (var i = 0; i < 80; i++) {
+                var s = document.createElement('div');
+                s.className = 'star' + (Math.random() > 0.85 ? ' large' : '');
+                s.style.left = Math.random() * 100 + '%';
+                s.style.top = Math.random() * 100 + '%';
+                s.style.setProperty('--dur', (2 + Math.random() * 4) + 's');
+                s.style.setProperty('--delay', (Math.random() * 3) + 's');
+                bg.appendChild(s);
+            }
+        })();
+    </script>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"><i class="fas fa-check-circle mr-2"></i>Saved successfully!</div>
+
+    <!-- Coming Soon Modal -->
+    <div class="modal-overlay" id="comingSoonModal">
+        <div class="modal-box">
+            <div class="w-14 h-14 mx-auto gradient-accent rounded-2xl flex items-center justify-center mb-4">
+                <i class="fas fa-rocket text-xl"></i>
+            </div>
+            <h3 class="text-lg font-bold mb-2">Coming Soon!</h3>
+            <p class="text-gray-400 text-sm mb-5" id="comingSoonMsg">This feature will be available soon.</p>
+            <button onclick="closeComingSoon()" class="btn-primary px-6 py-2.5 rounded-xl font-medium text-sm">Got it!</button>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+        {% for category, message in messages %}
+        <div class="flash-message flash-{{ category }}">
+            <i class="fas {{ 'fa-check-circle' if category == 'success' else 'fa-exclamation-circle' }} mr-2"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Sidebar (desktop) + Bottom Nav (mobile) injected by child templates -->
+    {% block nav %}{% endblock %}
+
+    <div class="relative z-10">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var loadingEl = document.getElementById('loading');
+            if (loadingEl && loadingEl.style.display !== 'none') {
+                hideLoadingScreen();
+                sessionStorage.setItem('tp_loaded', '1');
+            }
+        });
+
+        function showComingSoon(feature) {
+            const modal = document.getElementById('comingSoonModal');
+            const msg = document.getElementById('comingSoonMsg');
+            if (modal && msg) {
+                msg.textContent = feature + ' will be available in a future update.';
+                modal.classList.add('active');
+            }
+        }
+
+        function closeComingSoon() {
+            const modal = document.getElementById('comingSoonModal');
+            if (modal) modal.classList.remove('active');
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

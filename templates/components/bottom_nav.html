@@ -1,0 +1,25 @@
+<!-- Bottom Navigation - Glass Morphism -->
+<nav class="bottom-nav glass">
+    <div class="max-w-sm mx-auto flex justify-around py-3 px-2">
+        <a href="{{ url_for('dashboard.dashboard') }}" class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all {{ 'text-accent' if request.endpoint == 'dashboard.dashboard' else 'text-gray-500 hover:text-accent' }}">
+            <i class="fas fa-home text-lg"></i>
+            <span class="text-xs font-medium">Home</span>
+        </a>
+        <a href="{{ url_for('students.student_list') }}" class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all {{ 'text-accent' if 'students' in request.endpoint else 'text-gray-500 hover:text-accent' }}">
+            <i class="fas fa-user-graduate text-lg"></i>
+            <span class="text-xs font-medium">Students</span>
+        </a>
+        <a href="{{ url_for('schedule.schedule') }}" class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all {{ 'text-accent' if 'schedule' in request.endpoint else 'text-gray-500 hover:text-accent' }}">
+            <i class="fas fa-calendar-alt text-lg"></i>
+            <span class="text-xs font-medium">Schedule</span>
+        </a>
+        <a href="{{ url_for('fees.fees') }}" class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all {{ 'text-accent' if 'fees' in request.endpoint else 'text-gray-500 hover:text-accent' }}">
+            <i class="fas fa-rupee-sign text-lg"></i>
+            <span class="text-xs font-medium">Fees</span>
+        </a>
+        <a href="{{ url_for('profile.profile') }}" class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all {{ 'text-accent' if 'profile' in request.endpoint else 'text-gray-500 hover:text-accent' }}">
+            <i class="fas fa-user text-lg"></i>
+            <span class="text-xs font-medium">Profile</span>
+        </a>
+    </div>
+</nav>

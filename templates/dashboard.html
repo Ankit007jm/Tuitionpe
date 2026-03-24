@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <p class="text-gray-500 text-sm">Dashboard</p>
+            <h1 class="text-2xl font-bold mt-1">Hello, {{ current_user.name.split()[0] }}</h1>
+        </div>
+    </div>
+
+    <!-- Stats Grid — 2 cols mobile, 4 cols desktop -->
+    <div class="grid grid-cols-2 gap-3 mb-6 stats-grid-desktop">
+        <div class="card-dark rounded-2xl p-4">
+            <div class="w-10 h-10 gradient-blue rounded-xl flex items-center justify-center mb-3">
+                <i class="fas fa-user-graduate text-sm"></i>
+            </div>
+            <div class="text-2xl font-bold count-up" data-target="{{ stats.active_students }}">{{ stats.active_students }}</div>
+            <div class="text-gray-500 text-xs">Active Students</div>
+        </div>
+        <div class="card-dark rounded-2xl p-4">
+            <div class="w-10 h-10 gradient-purple rounded-xl flex items-center justify-center mb-3">
+                <i class="fas fa-chalkboard-teacher text-sm"></i>
+            </div>
+            <div class="text-2xl font-bold count-up" data-target="{{ stats.today_classes }}">{{ stats.today_classes }}</div>
+            <div class="text-gray-500 text-xs">Classes Today</div>
+        </div>
+        <div class="card-dark rounded-2xl p-4">
+            <div class="w-10 h-10 gradient-orange rounded-xl flex items-center justify-center mb-3">
+                <i class="fas fa-exclamation-triangle text-sm"></i>
+            </div>
+            <div class="text-2xl font-bold">₹<span class="count-up" data-target="{{ stats.pending_fees|int }}">{{ stats.pending_fees|int }}</span></div>
+            <div class="text-gray-500 text-xs">Pending Fees</div>
+        </div>
+        <div class="card-dark rounded-2xl p-4">
+            <div class="w-10 h-10 gradient-accent rounded-xl flex items-center justify-center mb-3">
+                <i class="fas fa-check-circle text-sm"></i>
+            </div>
+            <div class="text-2xl font-bold">₹<span class="count-up" data-target="{{ stats.collected_fees|int }}">{{ stats.collected_fees|int }}</span></div>
+            <div class="text-gray-500 text-xs">Collected</div>
+        </div>
+    </div>
+
+    <!-- Chart + Progress — side by side on desktop -->
+    <div class="two-col-desktop mb-6" style="gap:16px;">
+        <!-- Payment Chart -->
+        <div class="card-dark rounded-2xl p-4 mb-4 lg:mb-0">
+            <h3 class="font-semibold text-sm mb-3">Payment Trends</h3>
+            <div class="chart-container">
+                <canvas id="paymentChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Monthly Progress -->
+        <div class="card-dark rounded-2xl p-4 mb-4 lg:mb-0 flex flex-col justify-center">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="font-semibold text-sm">Monthly Collection</h3>
+                <span class="text-accent text-sm font-bold">{{ progress }}%</span>
+            </div>
+            <div class="w-full bg-white/5 rounded-full h-3 overflow-hidden">
+                <div class="progress-bar rounded-full" style="width: {{ progress }}%"></div>
+            </div>
+            <div class="flex justify-between mt-2 text-xs text-gray-500">
+                <span>₹{{ stats.collected_fees|int }} collected</span>
+                <span>₹{{ (stats.collected_fees + stats.pending_fees)|int }} total</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Classes -->
+    <div class="mb-6">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="font-semibold text-sm">Today's Classes</h3>
+            <a href="{{ url_for('schedule.schedule') }}" class="text-accent text-xs font-medium hover:underline">View All</a>
+        </div>
+        {% if today_classes %}
+        <div class="space-y-3">
+            {% for cls in today_classes %}
+            <div class="card-dark rounded-2xl p-4 {{ 'opacity-50' if cls.is_past and not cls.attendance else '' }}">
+                <div class="flex items-center gap-3">
+                    {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange'] %}
+                    <div class="w-10 h-10 {{ gradients[loop.index0 % 5] }} rounded-xl flex items-center justify-center avatar text-sm font-bold">
+                        {{ cls.student_initials }}
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-medium text-sm">{{ cls.student_name }}</div>
+                        <div class="text-gray-500 text-xs">{{ cls.subject }} - {{ cls.class_type }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm font-medium">{{ cls.start_time }}</div>
+                        {% if cls.attendance %}
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full
+                            {% if cls.attendance == 'completed' %}bg-emerald-500/10 text-emerald-500
+                            {% elif cls.attendance == 'absent' %}bg-red-500/10 text-red-400
+                            {% else %}bg-gray-500/10 text-gray-400{% endif %}">
+                            {{ cls.attendance|capitalize }}
+                        </span>
+                        {% elif cls.is_past %}
+                        <span class="text-gray-600 text-xs">Ended</span>
+                        {% else %}
+                        <span class="badge badge-{{ cls.fee_status }}">{{ cls.fee_status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-dark rounded-2xl p-6 text-center">
+            <i class="fas fa-calendar-check text-2xl text-gray-600 mb-2"></i>
+            <p class="text-gray-500 text-sm">No classes scheduled for today</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex gap-3 mb-4">
+        <a href="{{ url_for('students.add_student') }}" class="flex-1 btn-primary py-3 rounded-xl font-semibold text-sm text-center">
+            <i class="fas fa-plus mr-1"></i> Add Student
+        </a>
+        <a href="{{ url_for('fees.fees') }}" class="flex-1 btn-outline py-3 rounded-xl font-semibold text-sm text-center">
+            <i class="fas fa-rupee-sign mr-1"></i> View Fees
+        </a>
+    </div>
+    <!-- Self-Reminder shortcut -->
+    {% if current_user.email %}
+    <a href="{{ url_for('profile.send_today_email') }}"
+       class="w-full card-dark rounded-2xl p-3.5 flex items-center gap-3 hover:border-emerald-500/30 mb-6 block">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(16,185,129,0.1);">
+            <i class="fas fa-envelope text-emerald-500 text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium">Email me today's schedule</p>
+            <p class="text-gray-500 text-xs">With one-click Google Calendar buttons</p>
+        </div>
+        <i class="fas fa-chevron-right text-gray-600 text-xs flex-shrink-0"></i>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize chart
+    initPaymentChart(
+        {{ chart_data.labels|tojson }},
+        {{ chart_data.collected|tojson }},
+        {{ chart_data.pending|tojson }}
+    );
+
+    // Animate count-up values
+    const countUps = document.querySelectorAll('.count-up');
+    countUps.forEach(el => {
+        const target = parseInt(el.dataset.target) || 0;
+        animateCountUp(el, target, 1500);
+    });
+
+});
+</script>
+{% endblock %}

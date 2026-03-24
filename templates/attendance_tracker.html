@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Attendance Tracker{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <p class="text-gray-500 text-sm">Track & Export</p>
+            <h1 class="text-2xl font-bold mt-1">Attendance</h1>
+        </div>
+        <a href="{{ url_for('schedule.schedule') }}" class="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:text-accent transition-colors" style="background:rgba(255,255,255,0.05);">
+            <i class="fas fa-calendar-alt"></i>
+        </a>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-4 gap-2 mb-6">
+        <div class="card-dark rounded-2xl p-3 text-center">
+            <div class="text-lg font-bold text-accent">{{ completed_count }}</div>
+            <div class="text-gray-500 text-[10px]">Present</div>
+        </div>
+        <div class="card-dark rounded-2xl p-3 text-center">
+            <div class="text-lg font-bold text-red-400">{{ absent_count }}</div>
+            <div class="text-gray-500 text-[10px]">Absent</div>
+        </div>
+        <div class="card-dark rounded-2xl p-3 text-center">
+            <div class="text-lg font-bold text-gray-400">{{ cancelled_count }}</div>
+            <div class="text-gray-500 text-[10px]">Cancelled</div>
+        </div>
+        <div class="card-dark rounded-2xl p-3 text-center">
+            <div class="text-lg font-bold text-orange-400">{{ rescheduled_count }}</div>
+            <div class="text-gray-500 text-[10px]">Rescheduled</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card-dark rounded-2xl p-4 mb-6">
+        <form method="GET" action="{{ url_for('schedule.attendance_tracker') }}" id="filterForm">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <!-- Student Filter -->
+                <div>
+                    <label class="text-gray-500 text-xs mb-1 block">Student</label>
+                    <select name="student_id" class="input-dark rounded-xl py-2 px-3 text-sm text-white w-full" onchange="document.getElementById('filterForm').submit()">
+                        <option value="">All Students</option>
+                        {% for s in students %}
+                        <option value="{{ s.id }}" {{ 'selected' if student_id == s.id|string else '' }}>{{ s.student_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Status Filter -->
+                <div>
+                    <label class="text-gray-500 text-xs mb-1 block">Status</label>
+                    <select name="status" class="input-dark rounded-xl py-2 px-3 text-sm text-white w-full" onchange="document.getElementById('filterForm').submit()">
+                        <option value="">All Status</option>
+                        <option value="completed" {{ 'selected' if status_filter == 'completed' else '' }}>Present</option>
+                        <option value="absent" {{ 'selected' if status_filter == 'absent' else '' }}>Absent</option>
+                        <option value="cancelled" {{ 'selected' if status_filter == 'cancelled' else '' }}>Cancelled</option>
+                        <option value="rescheduled" {{ 'selected' if status_filter == 'rescheduled' else '' }}>Rescheduled</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <!-- Date From -->
+                <div>
+                    <label class="text-gray-500 text-xs mb-1 block">From</label>
+                    <input type="date" name="date_from" value="{{ date_from }}"
+                           class="input-dark rounded-xl py-2 px-3 text-sm text-white w-full" onchange="document.getElementById('filterForm').submit()">
+                </div>
+                <!-- Date To -->
+                <div>
+                    <label class="text-gray-500 text-xs mb-1 block">To</label>
+                    <input type="date" name="date_to" value="{{ date_to }}"
+                           class="input-dark rounded-xl py-2 px-3 text-sm text-white w-full" onchange="document.getElementById('filterForm').submit()">
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ url_for('schedule.attendance_tracker') }}" class="flex-1 py-2 rounded-xl text-xs font-semibold text-center text-gray-400 hover:text-white transition-all" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);">
+                    <i class="fas fa-times mr-1"></i> Clear Filters
+                </a>
+                <a href="{{ url_for('schedule.export_attendance', student_id=student_id, status=status_filter, date_from=date_from, date_to=date_to) }}"
+                   class="flex-1 py-2 rounded-xl text-xs font-semibold text-center text-accent hover:opacity-80 transition-all flex items-center justify-center gap-1"
+                   style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3);">
+                    <i class="fas fa-file-excel"></i> Download XLSX
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Total count -->
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm">Records <span class="text-gray-500">({{ total }})</span></h3>
+    </div>
+
+    <!-- Attendance Records -->
+    {% if attendance_data %}
+    <div class="space-y-3">
+        {% for item in attendance_data %}
+        {% set rec = item.record %}
+        {% set s = item.student %}
+        {% set sch = item.schedule %}
+        <div class="card-dark rounded-2xl p-4">
+            <div class="flex items-center gap-3">
+                {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange', 'gradient-green'] %}
+                <div class="w-10 h-10 {{ gradients[loop.index0 % 6] }} rounded-xl flex items-center justify-center avatar text-sm font-bold flex-shrink-0">
+                    {{ item.initials }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-medium text-sm truncate">{{ s.student_name }}</div>
+                    <div class="text-gray-500 text-xs">{{ s.subject or 'Tuition' }} &bull; {{ sch.start_time }}{% if sch.end_time %} - {{ sch.end_time }}{% endif %}</div>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <div class="text-gray-400 text-xs mb-1">{{ rec.date.strftime('%d %b') }}</div>
+                    {% if rec.status == 'completed' %}
+                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(16,185,129,0.15);color:#10b981;">Present</span>
+                    {% elif rec.status == 'absent' %}
+                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(239,68,68,0.15);color:#f87171;">Absent</span>
+                    {% elif rec.status == 'cancelled' %}
+                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(107,114,128,0.15);color:#9ca3af;">Cancelled</span>
+                    {% elif rec.status == 'rescheduled' %}
+                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(245,158,11,0.15);color:#f59e0b;">Rescheduled</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if rec.notes %}
+            <div class="mt-2 text-gray-500 text-xs pl-13">
+                <i class="fas fa-sticky-note mr-1"></i> {{ rec.notes }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-dark rounded-2xl p-8 text-center">
+        <i class="fas fa-clipboard-check text-3xl text-gray-600 mb-3"></i>
+        <p class="text-gray-400 font-medium">No attendance records found</p>
+        <p class="text-gray-600 text-sm mt-1">Mark attendance from the Schedule page</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}

@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Schedule{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <p class="text-gray-500 text-sm">Classes</p>
+            <h1 class="text-2xl font-bold mt-1">Schedule</h1>
+        </div>
+        <a href="{{ url_for('schedule.attendance_tracker') }}"
+           class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80"
+           style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+            <i class="fas fa-clipboard-check"></i> Track Attendance
+        </a>
+    </div>
+
+    <!-- Week Selector -->
+    <div class="flex gap-2 mb-5 overflow-x-auto pb-2" style="-webkit-overflow-scrolling: touch;">
+        {% for d in week_days %}
+        <a href="{{ url_for('schedule.schedule', day=d.day_name) }}"
+           class="flex-shrink-0 px-4 py-3 rounded-xl transition-all {{ 'btn-primary' if d.day_name == selected_day else 'card-dark text-gray-400 hover:text-white hover:border-accent/30' }}">
+            <div class="day-abbr text-xs font-medium">{{ d.day_abbr }}</div>
+            <div class="day-num text-lg font-bold mt-0.5">{{ d.day_num }}</div>
+            {% if d.is_today %}
+            <div class="w-1.5 h-1.5 rounded-full bg-accent mx-auto mt-1"></div>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Day Summary -->
+    <div class="card-dark rounded-2xl p-4 mb-5 border-l-4" style="border-left-color: #10b981;">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-sm font-medium">{{ selected_info.full_date }}</div>
+                <div class="text-gray-500 text-xs mt-1">{{ schedule_data|length }} class{{ 'es' if schedule_data|length != 1 else '' }} scheduled</div>
+            </div>
+            {% if schedule_data and selected_info.is_today %}
+            <a href="{{ url_for('schedule.remind_all_today') }}"
+               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+               style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                <i class="fab fa-whatsapp"></i> Remind All
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    {% if schedule_data %}
+    <div class="space-y-0">
+        {% for item in schedule_data %}
+        <div class="flex gap-4 mb-4">
+            <!-- Time Column -->
+            <div class="flex flex-col items-center" style="min-width: 50px;">
+                <div class="text-sm font-semibold text-emerald-500">{{ item.schedule.start_time }}</div>
+                <div class="timeline-dot mt-2"></div>
+                {% if not loop.last %}
+                <div class="timeline-line flex-1"></div>
+                {% endif %}
+            </div>
+            <!-- Card -->
+            <div class="flex-1 card-dark rounded-2xl p-4 mb-2">
+                <div class="flex items-center gap-3">
+                    {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange'] %}
+                    <div class="w-10 h-10 {{ gradients[loop.index0 % 5] }} rounded-xl flex items-center justify-center avatar text-sm">
+                        {{ item.initials }}
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-medium text-sm">{{ item.student.student_name }}</div>
+                        <div class="text-gray-500 text-xs">{{ item.student.subject }} - {{ item.schedule.class_type }}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ url_for('schedule.remind_class', id=item.schedule.id) }}" target="_blank"
+                           class="text-green-500 hover:text-green-400 text-xs" title="Send WhatsApp Reminder">
+                            <i class="fab fa-whatsapp text-base"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('schedule.delete_schedule', id=item.schedule.id) }}" onsubmit="return confirm('Remove this class?');" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="text-gray-600 hover:text-red-400 text-xs" title="Remove class">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% if item.schedule.end_time %}
+                <div class="text-gray-600 text-xs mt-2">
+                    <i class="fas fa-clock mr-1"></i> {{ item.schedule.start_time }} - {{ item.schedule.end_time }}
+                </div>
+                {% endif %}
+
+                <!-- Attendance buttons (only for today) -->
+                {% if selected_info.is_today %}
+                <div class="mt-3 pt-3 border-t border-white/5">
+                    {% if item.attendance %}
+                    <div class="mb-2">
+                        <span class="text-xs font-medium px-3 py-1 rounded-lg inline-flex items-center gap-1
+                            {% if item.attendance.status == 'completed' %}bg-emerald-500/10 text-emerald-500
+                            {% elif item.attendance.status == 'absent' %}bg-red-500/10 text-red-400
+                            {% elif item.attendance.status == 'rescheduled' %}bg-orange-500/10 text-orange-400
+                            {% else %}bg-gray-500/10 text-gray-400{% endif %}">
+                            <i class="fas {% if item.attendance.status == 'completed' %}fa-check{% elif item.attendance.status == 'absent' %}fa-user-slash{% elif item.attendance.status == 'rescheduled' %}fa-calendar-day{% else %}fa-ban{% endif %}"></i>
+                            {{ item.attendance.status|capitalize }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('schedule.mark_attendance', id=item.schedule.id) }}" class="grid grid-cols-4 gap-1.5">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" name="attendance_status" value="completed"
+                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                                {% if item.attendance and item.attendance.status == 'completed' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-white/5 text-gray-400 hover:bg-emerald-500/10 hover:text-emerald-400{% endif %}"
+                                title="Present">
+                            <i class="fas fa-check"></i> Present
+                        </button>
+                        <button type="submit" name="attendance_status" value="absent"
+                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                                {% if item.attendance and item.attendance.status == 'absent' %}bg-red-500/20 text-red-400 border border-red-500/30{% else %}bg-white/5 text-gray-400 hover:bg-red-500/10 hover:text-red-400{% endif %}"
+                                title="Absent">
+                            <i class="fas fa-user-slash"></i> Absent
+                        </button>
+                        <button type="submit" name="attendance_status" value="cancelled"
+                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                                {% if item.attendance and item.attendance.status == 'cancelled' %}bg-gray-500/20 text-gray-300 border border-gray-500/30{% else %}bg-white/5 text-gray-400 hover:bg-gray-500/10 hover:text-gray-300{% endif %}"
+                                title="Cancelled">
+                            <i class="fas fa-ban"></i> Cancel
+                        </button>
+                        <button type="submit" name="attendance_status" value="rescheduled"
+                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                                {% if item.attendance and item.attendance.status == 'rescheduled' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}bg-white/5 text-gray-400 hover:bg-orange-500/10 hover:text-orange-400{% endif %}"
+                                title="Rescheduled">
+                            <i class="fas fa-calendar-day"></i> Resched
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-dark rounded-2xl p-8 text-center">
+        <i class="fas fa-calendar-plus text-3xl text-gray-600 mb-3"></i>
+        <p class="text-gray-400 font-medium mb-1">No classes on this day</p>
+        <p class="text-gray-600 text-sm">Tap + to schedule a class</p>
+    </div>
+    {% endif %}
+
+    <!-- FAB -->
+    <button onclick="openAddClass()" class="fixed bottom-24 right-6 w-14 h-14 btn-primary rounded-full flex items-center justify-center shadow-lg z-40">
+        <i class="fas fa-plus text-lg"></i>
+    </button>
+
+    <!-- Add Class Modal -->
+    <div class="modal-overlay" id="addClassModal">
+        <div class="modal-box text-left" style="max-width: 400px;">
+            <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                <i class="fas fa-calendar-plus text-emerald-500"></i> Add Class
+            </h3>
+            <form method="POST" action="{{ url_for('schedule.add_schedule') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="day_of_week" value="{{ selected_day }}">
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Student *</label>
+                        <select name="student_id" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm" required>
+                            <option value="">Select student</option>
+                            {% for s in students %}
+                            <option value="{{ s.id }}">{{ s.student_name }} ({{ s.subject }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">Start Time *</label>
+                            <input type="time" name="start_time" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">End Time</label>
+                            <input type="time" name="end_time" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Type</label>
+                        <select name="class_type" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm">
+                            <option value="offline">Offline</option>
+                            <option value="online">Online</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Location</label>
+                        <input type="text" name="location" placeholder="e.g., Home, Student's place" class="w-full input-dark rounded-xl py-2.5 px-3 text-white placeholder-gray-600 text-sm">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-5">
+                    <button type="button" onclick="closeAddClass()" class="flex-1 btn-outline py-2.5 rounded-xl text-sm">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary py-2.5 rounded-xl text-sm">Add Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}

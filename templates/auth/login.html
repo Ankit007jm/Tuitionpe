@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-8 grid-bg relative z-10">
+    <div class="w-full auth-container mx-auto">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text gradient-accent mb-2">TuitionPe</h1>
+            <p class="text-gray-500">Manage your tuition business effortlessly</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="card-dark rounded-3xl p-7">
+            <h2 class="text-2xl font-bold mb-1">Welcome back</h2>
+            <p class="text-gray-500 text-sm mb-6">Enter your credentials to continue</p>
+
+            <form method="POST" action="{{ url_for('auth.login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Phone Number</label>
+                    <div class="flex phone-group">
+                        <span class="phone-prefix">+91</span>
+                        <input type="tel" name="phone" placeholder="Enter 10-digit number" class="phone-input" maxlength="10" pattern="[0-9]{10}" required>
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Password</label>
+                    <div class="relative">
+                        <input type="password" name="password" id="loginPass" placeholder="Enter your password" class="w-full input-dark rounded-xl py-3.5 px-4 pr-12 text-white placeholder-gray-600" required>
+                        <button type="button" onclick="togglePass('loginPass','loginEye')" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-accent transition-colors">
+                            <i class="fas fa-eye" id="loginEye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-6 text-sm">
+                    <label class="flex items-center gap-2 cursor-pointer text-gray-400 hover:text-white transition-colors">
+                        <input type="checkbox" name="remember" class="w-4 h-4 rounded accent-accent">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="{{ url_for('auth.forgot_password') }}" class="text-accent hover:underline hover:text-accent-light transition-colors">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="w-full btn-primary text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2">
+                    <span>Sign In</span>
+                    <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                </button>
+            </form>
+
+            <div class="flex items-center gap-4 my-6">
+                <div class="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                <span class="text-gray-500 text-xs">or continue with</span>
+                <div class="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="showComingSoon('Google Login')" class="flex-1 card-dark py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:border-accent/30">
+                    <i class="fab fa-google"></i> Google
+                </button>
+                <button onclick="showComingSoon('Apple Login')" class="flex-1 card-dark py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:border-accent/30">
+                    <i class="fab fa-apple"></i> Apple
+                </button>
+            </div>
+
+            <p class="text-center mt-6 text-gray-500 text-sm">
+                New to TuitionPe? <a href="{{ url_for('auth.signup') }}" class="text-accent font-medium hover:underline">Create account</a>
+            </p>
+        </div>
+
+        <p class="text-center text-gray-600 text-xs mt-6">
+            By signing in, you agree to our
+            <a href="#" onclick="showComingSoon('Terms of Service')" class="text-gray-400 hover:text-accent transition-colors">Terms</a> &
+            <a href="#" onclick="showComingSoon('Privacy Policy')" class="text-gray-400 hover:text-accent transition-colors">Privacy Policy</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function togglePass(inputId, eyeId) {
+    const inp = document.getElementById(inputId);
+    const eye = document.getElementById(eyeId);
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        eye.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        inp.type = 'password';
+        eye.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+</script>
+{% endblock %}

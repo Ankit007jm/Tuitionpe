@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Remind All{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{{ url_for('schedule.schedule') }}" class="w-11 h-11 rounded-xl border border-white/10 flex items-center justify-center hover:border-accent/50 hover:bg-white/5 transition-all">
+            <i class="fas fa-arrow-left text-gray-400"></i>
+        </a>
+        <div>
+            <p class="text-gray-500 text-sm">WhatsApp Reminders</p>
+            <h1 class="text-2xl font-bold mt-1">Remind All</h1>
+        </div>
+    </div>
+
+    <div class="card-dark rounded-2xl p-4 mb-5 border-l-4" style="border-left-color: #10b981;">
+        <p class="text-sm text-gray-300">
+            <i class="fab fa-whatsapp text-emerald-500 mr-2"></i>
+            Tap each button to send a WhatsApp reminder. {{ reminder_links|length }} class{{ 'es' if reminder_links|length != 1 else '' }} today.
+        </p>
+    </div>
+
+    <div class="space-y-3">
+        {% for item in reminder_links %}
+        <a href="{{ item.link }}" target="_blank" class="card-dark rounded-2xl p-4 flex items-center gap-4 hover:border-emerald-500/30 transition-all block">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(16,185,129,0.15);">
+                <i class="fab fa-whatsapp text-xl" style="color:#10b981;"></i>
+            </div>
+            <div class="flex-1">
+                <div class="font-medium text-sm">{{ item.student_name }}</div>
+                <div class="text-gray-500 text-xs">{{ item.subject }} at {{ item.time }}</div>
+            </div>
+            <i class="fas fa-external-link-alt text-gray-600 text-xs"></i>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}

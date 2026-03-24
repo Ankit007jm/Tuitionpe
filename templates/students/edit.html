@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Edit Student{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('students.student_list') }}" class="w-11 h-11 rounded-xl border border-white/10 flex items-center justify-center hover:border-accent/50 hover:bg-white/5 transition-all">
+                <i class="fas fa-arrow-left text-gray-400"></i>
+            </a>
+            <div>
+                <p class="text-gray-500 text-sm">Edit Student</p>
+                <h1 class="text-2xl font-bold mt-1">{{ student.student_name }}</h1>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('students.delete_student', id=student.id) }}" onsubmit="return confirm('Archive {{ student.student_name }}? They will be moved to the archived list.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn-danger text-sm">
+                <i class="fas fa-archive mr-1"></i> Archive
+            </button>
+        </form>
+    </div>
+
+    <form method="POST" action="{{ url_for('students.edit_student', id=student.id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="card-dark rounded-3xl p-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Student Name *</label>
+                    <input type="text" name="student_name" value="{{ student.student_name }}" class="w-full input-dark rounded-xl py-3 px-4 text-white text-sm" required>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Class *</label>
+                    <select name="class_grade" class="w-full input-dark rounded-xl py-3 px-4 text-white text-sm" required>
+                        {% for c in range(1, 13) %}
+                        <option value="{{ c }}" {{ 'selected' if student.class_grade == c|string else '' }}>Class {{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Subjects * <span class="text-gray-600">(select one or more)</span></label>
+                    {% set student_subjects = student.subject.split(',') if student.subject else [] %}
+                    <div class="flex flex-wrap gap-2" id="subjectCheckboxes">
+                        {% set all_subjects = [] %}
+                        {% for s in subjects %}
+                            {% if s not in all_subjects %}
+                                {% if all_subjects.append(s) %}{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for s in ['Physics', 'Maths', 'Chemistry', 'Biology', 'English', 'Hindi', 'Science', 'SST', 'Drawing', 'Arts'] %}
+                            {% if s not in all_subjects %}
+                                {% if all_subjects.append(s) %}{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        {# Also include any student-specific subjects not in the standard list #}
+                        {% for s in student_subjects %}
+                            {% if s and s.strip() not in all_subjects %}
+                                {% if all_subjects.append(s.strip()) %}{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for s in all_subjects %}
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="subject" value="{{ s }}" class="hidden peer"
+                                   {{ 'checked' if s in student_subjects else '' }}>
+                            <span class="inline-block px-3 py-1.5 rounded-lg border border-white/10 text-xs text-gray-400 peer-checked:border-accent peer-checked:text-accent peer-checked:bg-accent/10 transition-all">{{ s }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <!-- Custom subject input -->
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="customSubjectInput" placeholder="Other subject name..." class="flex-1 input-dark rounded-xl py-2 px-3 text-sm text-white placeholder-gray-600">
+                        <button type="button" onclick="addCustomSubject()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-all">+ Add</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1.5">Parent Name *</label>
+                    <input type="text" name="parent_name" value="{{ student.parent_name }}" class="w-full input-dark rounded-xl py-3 px-3 text-white text-sm" required>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1.5">WhatsApp Number *</label>
+                    <div class="flex phone-group">
+                        <span class="phone-prefix flex items-center text-sm">+91</span>
+                        <input type="tel" name="parent_phone" value="{{ student.parent_phone }}" class="phone-input text-sm" maxlength="10" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1.5">Fee Amount (₹) *</label>
+                        <input type="number" name="fee_amount" value="{{ student.fee_amount|int }}" min="0" class="w-full input-dark rounded-xl py-3 px-3 text-white text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1.5">Payment Cycle</label>
+                        <select name="payment_cycle" class="w-full input-dark rounded-xl py-3 px-3 text-white text-sm">
+                            <option value="monthly" {{ 'selected' if student.payment_cycle == 'monthly' else '' }}>Monthly</option>
+                            <option value="weekly" {{ 'selected' if student.payment_cycle == 'weekly' else '' }}>Weekly</option>
+                            <option value="daily" {{ 'selected' if student.payment_cycle == 'daily' else '' }}>Daily</option>
+                            <option value="per_class" {{ 'selected' if student.payment_cycle == 'per_class' else '' }}>Per Class</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Student Type</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="student_type" value="regular" {{ 'checked' if student.student_type == 'regular' else '' }} class="w-4 h-4">
+                            <span class="text-sm">Regular</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="student_type" value="exam" {{ 'checked' if student.student_type == 'exam' else '' }} class="w-4 h-4">
+                            <span class="text-sm">Exam Only</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1.5">Notes</label>
+                    <textarea name="notes" rows="2" class="w-full input-dark rounded-xl py-3 px-3 text-white text-sm resize-none">{{ student.notes or '' }}</textarea>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full btn-primary text-white py-3 rounded-xl font-semibold mt-6">
+                <i class="fas fa-save mr-2"></i> Save Changes
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addCustomSubject() {
+    const input = document.getElementById('customSubjectInput');
+    const name = input.value.trim();
+    if (!name) return;
+    const container = document.getElementById('subjectCheckboxes');
+    const label = document.createElement('label');
+    label.className = 'cursor-pointer';
+    label.innerHTML = `<input type="checkbox" name="subject" value="${name}" class="hidden peer" checked>
+        <span class="inline-block px-3 py-1.5 rounded-lg border border-accent text-xs text-accent bg-accent/10 transition-all">${name}</span>`;
+    container.appendChild(label);
+    input.value = '';
+}
+</script>
+{% endblock %}

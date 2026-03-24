@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="mb-6">
+        <p class="text-gray-500 text-sm">Profile</p>
+        <h1 class="text-2xl font-bold mt-1">Settings</h1>
+    </div>
+
+    <!-- Profile Header Card -->
+    <div class="card-dark rounded-2xl p-6 mb-5 text-center">
+        <!-- Avatar -->
+        <div class="relative inline-block mb-3">
+            <div class="w-24 h-24 gradient-accent rounded-2xl flex items-center justify-center avatar mx-auto" id="profileAvatar">
+                {% if current_user.profile_image %}
+                <img src="{{ url_for('static', filename=current_user.profile_image.replace('static/', '').lstrip('/')) }}" alt="" class="rounded-2xl">
+                {% else %}
+                <span class="text-3xl font-bold">{{ current_user.name[0] }}</span>
+                {% endif %}
+            </div>
+            <form method="POST" action="{{ url_for('profile.upload_avatar') }}" enctype="multipart/form-data" id="avatarForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="file" name="avatar" id="profileAvatarInput" class="hidden" accept="image/*"
+                       onchange="document.getElementById('avatarForm').submit();">
+                <label for="profileAvatarInput" class="absolute -bottom-1 -right-1 w-8 h-8 gradient-accent rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition shadow-lg">
+                    <i class="fas fa-camera text-xs"></i>
+                </label>
+            </form>
+        </div>
+
+        <h2 class="text-lg font-bold">{{ current_user.name }}</h2>
+        {% if current_user.subjects %}
+        <div class="flex flex-wrap justify-center gap-1 mt-2">
+            {% for subj in current_user.subjects.split(',') %}
+            <span class="px-3 py-1 rounded-full text-xs badge badge-paid">{{ subj.strip() }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if current_user.experience_years %}
+        <p class="text-gray-500 text-sm mt-1">{{ current_user.experience_years }} years experience</p>
+        {% endif %}
+
+        <!-- Stats Row with Count-up -->
+        <div class="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/5">
+            <div>
+                <div class="text-lg font-bold count-up" data-target="{{ student_count }}">{{ student_count }}</div>
+                <div class="text-gray-500 text-xs">Students</div>
+            </div>
+            <div>
+                <div class="text-lg font-bold">₹<span class="count-up" data-target="{{ month_collected|int }}">{{ month_collected|int }}</span></div>
+                <div class="text-gray-500 text-xs">This Month</div>
+            </div>
+            <div>
+                <div class="text-lg font-bold count-up" data-target="{{ schedule_count }}">{{ schedule_count }}</div>
+                <div class="text-gray-500 text-xs">Classes</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personal Info Section with Inline Editing -->
+    <div class="card-dark rounded-2xl p-5 mb-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i class="fas fa-user text-accent"></i> Personal Info
+            </h3>
+            <button onclick="toggleEdit('personal')" class="text-accent text-xs font-medium hover:text-accent-light">
+                <i class="fas fa-pen text-xs mr-1"></i>Edit
+            </button>
+        </div>
+
+        <!-- Display Mode -->
+        <div id="personalDisplay">
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Full Name</span>
+                    <span class="text-sm">{{ current_user.name }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Phone</span>
+                    <span class="text-sm">+91 {{ current_user.phone }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Email</span>
+                    <span class="text-sm">{{ current_user.email or 'Not set' }}</span>
+                </div>
+            </div>
+            {% if not current_user.email %}
+            <div class="mt-3 p-2.5 rounded-xl" style="background:rgba(249,115,22,0.06); border:1px solid rgba(249,115,22,0.15);">
+                <p class="text-orange-400/80 text-xs flex items-start gap-2">
+                    <i class="fas fa-exclamation-triangle mt-0.5"></i>
+                    <span>Add your email to enable password reset via OTP.</span>
+                </p>
+            </div>
+            {% else %}
+            <div class="mt-3 p-2.5 rounded-xl" style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15);">
+                <p class="text-emerald-400/80 text-xs flex items-start gap-2">
+                    <i class="fas fa-shield-alt mt-0.5"></i>
+                    <span>Password reset OTPs will be sent to this email.</span>
+                </p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Edit Mode -->
+        <div id="personalForm" style="display:none;">
+            <form method="POST" action="{{ url_for('profile.update_profile') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="section" value="personal">
+                <div class="space-y-3">
+                    <input type="text" name="name" value="{{ current_user.name }}" class="w-full input-dark rounded-xl py-3 px-4 text-sm disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Full Name">
+                    <input type="tel" name="phone" value="{{ current_user.phone }}" class="w-full input-dark rounded-xl py-3 px-4 text-sm disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Phone" maxlength="10">
+                    <input type="email" name="email" value="{{ current_user.email or '' }}" class="w-full input-dark rounded-xl py-3 px-4 text-sm disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Email">
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="toggleEdit('personal')" class="flex-1 btn-outline py-2.5 rounded-xl text-xs">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary py-2.5 rounded-xl text-xs">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Teaching Info Section -->
+    <div class="card-dark rounded-2xl p-5 mb-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i class="fas fa-chalkboard text-emerald-500"></i> Teaching Info
+            </h3>
+            <button onclick="toggleEdit('teaching')" class="text-emerald-500 text-xs font-medium">Edit</button>
+        </div>
+
+        <div id="teachingDisplay">
+            <div class="space-y-3">
+                <div class="flex justify-between items-start">
+                    <span class="text-gray-500 text-sm">Subjects</span>
+                    <span class="text-sm text-right">{{ current_user.subjects or 'Not set' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Classes</span>
+                    <span class="text-sm">{{ current_user.classes_taught or 'Not set' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Experience</span>
+                    <span class="text-sm">{{ current_user.experience_years or 0 }} years</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Qualification</span>
+                    <span class="text-sm">{{ current_user.qualification or 'Not set' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="teachingForm" style="display:none;">
+            <form method="POST" action="{{ url_for('profile.update_profile') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="section" value="teaching">
+                <div class="space-y-3">
+                    <input type="text" name="subjects" value="{{ current_user.subjects or '' }}" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm" placeholder="Subjects (comma-separated)">
+                    <input type="text" name="classes_taught" value="{{ current_user.classes_taught or '' }}" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm" placeholder="Classes (e.g., 9-10,11-12)">
+                    <input type="number" name="experience" value="{{ current_user.experience_years or 0 }}" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm" placeholder="Experience (years)">
+                    <select name="qualification" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm">
+                        <option value="">Select qualification</option>
+                        {% for q in ['B.Sc', 'M.Sc', 'B.Tech', 'M.Tech', 'B.Ed', 'M.Ed', 'PhD', 'Other'] %}
+                        <option value="{{ q }}" {{ 'selected' if current_user.qualification == q else '' }}>{{ q }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="toggleEdit('teaching')" class="flex-1 btn-outline py-2 rounded-xl text-xs">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary py-2 rounded-xl text-xs">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Info Section -->
+    <div class="card-dark rounded-2xl p-5 mb-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i class="fas fa-credit-card text-emerald-500"></i> Payment Info
+            </h3>
+            <button onclick="toggleEdit('payment')" class="text-emerald-500 text-xs font-medium">Edit</button>
+        </div>
+
+        <div id="paymentDisplay">
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">UPI ID</span>
+                    <span class="text-sm">{{ current_user.upi_id or 'Not set' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Bank Account</span>
+                    <span class="text-sm">{{ ('XXXX' + current_user.bank_account[-4:]) if current_user.bank_account and current_user.bank_account|length > 4 else (current_user.bank_account or 'Not set') }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">IFSC</span>
+                    <span class="text-sm">{{ current_user.ifsc_code or 'Not set' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="paymentForm" style="display:none;">
+            <form method="POST" action="{{ url_for('profile.update_profile') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="section" value="payment">
+                <div class="space-y-3">
+                    <input type="text" name="upi_id" value="{{ current_user.upi_id or '' }}" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm" placeholder="UPI ID (e.g., name@paytm)">
+                    <input type="text" name="bank_account" value="{{ current_user.bank_account or '' }}" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm" placeholder="Bank Account Number">
+                    <input type="text" name="ifsc_code" value="{{ current_user.ifsc_code or '' }}" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm" placeholder="IFSC Code" maxlength="11">
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="toggleEdit('payment')" class="flex-1 btn-outline py-2 rounded-xl text-xs">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary py-2 rounded-xl text-xs">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- QR Code Upload -->
+    <div class="card-dark rounded-2xl p-5 mb-4">
+        <h3 class="font-semibold text-sm flex items-center gap-2 mb-4">
+            <i class="fas fa-qrcode text-emerald-500"></i> Payment QR Code
+        </h3>
+        {% if current_user.qr_image_path %}
+        <div class="w-32 h-32 mx-auto mb-3 rounded-xl overflow-hidden bg-white p-2">
+            <img src="{{ url_for('static', filename=current_user.qr_image_path.replace('static/', '').lstrip('/')) }}" alt="QR Code" class="w-full h-full object-contain">
+        </div>
+        {% endif %}
+        <form method="POST" action="{{ url_for('profile.upload_qr') }}" enctype="multipart/form-data" class="text-center">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="file" name="qr_image" accept="image/*" class="input-dark rounded-xl py-2 px-3 text-sm text-gray-400 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-emerald-500/10 file:text-emerald-500 w-full mb-3">
+            <button type="submit" class="btn-primary px-6 py-2 rounded-xl text-xs">Upload QR</button>
+        </form>
+    </div>
+
+    <!-- Bio Section -->
+    <div class="card-dark rounded-2xl p-5 mb-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i class="fas fa-info-circle text-emerald-500"></i> About
+            </h3>
+            <button onclick="toggleEdit('bio')" class="text-emerald-500 text-xs font-medium">Edit</button>
+        </div>
+
+        <div id="bioDisplay">
+            <p class="text-gray-400 text-sm">{{ current_user.bio or 'No bio added yet.' }}</p>
+        </div>
+
+        <div id="bioForm" style="display:none;">
+            <form method="POST" action="{{ url_for('profile.update_profile') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="section" value="bio">
+                <textarea name="bio" rows="3" maxlength="500" class="w-full input-dark rounded-xl py-2.5 px-3 text-sm resize-none">{{ current_user.bio or '' }}</textarea>
+                <div class="flex gap-2 mt-3">
+                    <button type="button" onclick="toggleEdit('bio')" class="flex-1 btn-outline py-2 rounded-xl text-xs">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary py-2 rounded-xl text-xs">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reminder Settings -->
+    <div class="card-dark rounded-2xl p-5 mb-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i class="fas fa-bell text-emerald-500"></i> Class Reminders
+            </h3>
+            <button onclick="toggleEdit('reminder')" class="text-emerald-500 text-xs font-medium">
+                <i class="fas fa-pen text-xs mr-1"></i>Edit
+            </button>
+        </div>
+
+        <!-- Display Mode -->
+        <div id="reminderDisplay">
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-500 text-sm">Daily Email Reminder</span>
+                    {% if current_user.daily_reminder %}
+                    <span class="badge badge-paid">ON</span>
+                    {% else %}
+                    <span class="badge badge-pending">OFF</span>
+                    {% endif %}
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">Morning Email Time</span>
+                    <span class="text-sm">
+                        {{ '%02d:%02d'|format(current_user.reminder_hour or 7, current_user.reminder_minute or 0) }}
+                        {{ 'AM' if (current_user.reminder_hour or 7) < 12 else 'PM' }}
+                    </span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 text-sm">30-min Before Alerts</span>
+                    <span class="badge badge-paid">Auto</span>
+                </div>
+            </div>
+            {% if not current_user.email %}
+            <div class="mt-3 p-2.5 rounded-xl" style="background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);">
+                <p class="text-orange-400/80 text-xs flex items-start gap-2">
+                    <i class="fas fa-exclamation-triangle mt-0.5"></i>
+                    <span>Add your email in Personal Info above to receive reminder emails.</span>
+                </p>
+            </div>
+            {% else %}
+            <!-- Send Today's Schedule Button -->
+            <a href="{{ url_for('profile.send_today_email') }}"
+               class="mt-3 w-full btn-outline py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 hover:border-emerald-500/50">
+                <i class="fas fa-paper-plane text-emerald-500"></i>
+                Email me today's schedule now
+            </a>
+            <p class="text-gray-600 text-xs text-center mt-2">
+                Each class has a one-click <span class="text-blue-400">📅 Add to Google Calendar</span> button
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- Edit Mode -->
+        <div id="reminderForm" style="display:none;">
+            <form method="POST" action="{{ url_for('profile.update_profile') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="section" value="reminder">
+                <div class="space-y-4">
+                    <!-- Toggle switch -->
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium">Daily Email Reminder</p>
+                            <p class="text-gray-500 text-xs mt-0.5">Get today's schedule every morning</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer ml-3">
+                            <input type="hidden" name="daily_reminder" value="0">
+                            <input type="checkbox" name="daily_reminder" value="1"
+                                   id="reminderToggle"
+                                   class="sr-only peer"
+                                   {{ 'checked' if current_user.daily_reminder else '' }}>
+                            <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer
+                                        peer-checked:after:translate-x-full peer-checked:after:border-white
+                                        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                        after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                                        peer-checked:bg-emerald-600"></div>
+                        </label>
+                    </div>
+                    <!-- Time picker -->
+                    <div>
+                        <label class="text-sm text-gray-400 mb-1.5 block">Morning reminder time</label>
+                        <div class="flex gap-2 items-center">
+                            <select name="reminder_hour" class="input-dark rounded-xl py-2.5 px-3 text-sm flex-1">
+                                {% for h in range(4, 13) %}
+                                <option value="{{ h }}" {{ 'selected' if (current_user.reminder_hour or 7) == h }}>
+                                    {{ '%02d'|format(h) }} ({{ 'AM' if h < 12 else '12 PM' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <span class="text-gray-500 text-sm">:</span>
+                            <select name="reminder_minute" class="input-dark rounded-xl py-2.5 px-3 text-sm flex-1">
+                                {% for m in [0, 15, 30, 45] %}
+                                <option value="{{ m }}" {{ 'selected' if (current_user.reminder_minute or 0) == m }}>
+                                    {{ '%02d'|format(m) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="toggleEdit('reminder')" class="flex-1 btn-outline py-2 rounded-xl text-xs">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary py-2 rounded-xl text-xs">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="space-y-3 mb-6">
+        <a href="{{ url_for('auth.forgot_password') }}" class="w-full card-dark rounded-2xl p-4 flex items-center gap-3 hover:border-emerald-500/30 block">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(249,115,22,0.1);">
+                <i class="fas fa-key text-orange-500 text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Change Password</span>
+            <i class="fas fa-chevron-right text-gray-600 ml-auto text-xs"></i>
+        </a>
+
+        <button onclick="showComingSoon('Help & Support')" class="w-full card-dark rounded-2xl p-4 flex items-center gap-3 hover:border-emerald-500/30">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(59,130,246,0.1);">
+                <i class="fas fa-question-circle text-blue-500 text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Help & Support</span>
+            <i class="fas fa-chevron-right text-gray-600 ml-auto text-xs"></i>
+        </button>
+
+        <a href="{{ url_for('auth.logout') }}" class="w-full card-dark rounded-2xl p-4 flex items-center gap-3 hover:border-red-500/30 block">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(239,68,68,0.1);">
+                <i class="fas fa-sign-out-alt text-red-500 text-sm"></i>
+            </div>
+            <span class="text-sm font-medium text-red-400">Logout</span>
+            <i class="fas fa-chevron-right text-gray-600 ml-auto text-xs"></i>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}
