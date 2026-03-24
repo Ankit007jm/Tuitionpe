@@ -459,7 +459,7 @@ def send_receipt_email(app, tutor, student, payment):
     msg.attach(attachment)
 
     try:
-        server = smtplib.SMTP(cfg['MAIL_SERVER'], cfg['MAIL_PORT'])
+        server = smtplib.SMTP(cfg['MAIL_SERVER'], cfg['MAIL_PORT'], timeout=20)
         server.ehlo()
         server.starttls()
         server.login(cfg['MAIL_USERNAME'], cfg['MAIL_PASSWORD'])

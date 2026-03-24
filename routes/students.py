@@ -114,6 +114,8 @@ def add_student():
             return redirect(url_for('students.add_student'))
 
         # Handle profile image
+        from werkzeug.utils import secure_filename
+        from utils import upload_image
         profile_image = None
         if 'profile_image' in request.files:
             file = request.files['profile_image']
@@ -121,12 +123,8 @@ def add_student():
                 if not _allowed_file(file.filename):
                     flash('Only image files (PNG, JPG, GIF, WEBP) are allowed.', 'error')
                     return redirect(url_for('students.add_student'))
-                from werkzeug.utils import secure_filename
                 filename = secure_filename(f"student_{parent_phone}_{file.filename}")
-                upload_dir = current_app.config['UPLOAD_FOLDER']
-                os.makedirs(upload_dir, exist_ok=True)
-                file.save(os.path.join(upload_dir, filename))
-                profile_image = f"uploads/{filename}"
+                profile_image = upload_image(file, filename)
 
         student = Student(
             tutor_id=current_user.id,
@@ -214,11 +212,9 @@ def edit_student(id):
                     flash('Only image files (PNG, JPG, GIF, WEBP) are allowed.', 'error')
                     return redirect(url_for('students.edit_student', id=id))
                 from werkzeug.utils import secure_filename
+                from utils import upload_image
                 filename = secure_filename(f"student_{student.parent_phone}_{file.filename}")
-                upload_dir = current_app.config['UPLOAD_FOLDER']
-                os.makedirs(upload_dir, exist_ok=True)
-                file.save(os.path.join(upload_dir, filename))
-                student.profile_image = f"uploads/{filename}"
+                student.profile_image = upload_image(file, filename)
 
         db.session.commit()
         flash(f'{student.student_name} updated successfully!', 'success')

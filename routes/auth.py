@@ -84,7 +84,7 @@ def send_otp_email(to_email, otp, tutor_name):
     msg.attach(MIMEText(html_body, 'html'))
 
     try:
-        server = smtplib.SMTP(cfg['MAIL_SERVER'], cfg['MAIL_PORT'])
+        server = smtplib.SMTP(cfg['MAIL_SERVER'], cfg['MAIL_PORT'], timeout=20)
         server.ehlo()
         server.starttls()
         server.login(cfg['MAIL_USERNAME'], cfg['MAIL_PASSWORD'])
@@ -165,28 +165,22 @@ def signup():
             return redirect(url_for('auth.signup'))
 
         # Handle profile image upload
+        from werkzeug.utils import secure_filename
+        from utils import upload_image
         profile_image = None
         if 'profile_image' in request.files:
             file = request.files['profile_image']
             if file and file.filename:
-                from werkzeug.utils import secure_filename
                 filename = secure_filename(f"tutor_{phone}_{file.filename}")
-                upload_dir = current_app.config['UPLOAD_FOLDER']
-                os.makedirs(upload_dir, exist_ok=True)
-                file.save(os.path.join(upload_dir, filename))
-                profile_image = f"uploads/{filename}"
+                profile_image = upload_image(file, filename)
 
         # Handle QR code upload
         qr_image_path = None
         if 'qr_image' in request.files:
             file = request.files['qr_image']
             if file and file.filename:
-                from werkzeug.utils import secure_filename
                 filename = secure_filename(f"qr_{phone}_{file.filename}")
-                upload_dir = current_app.config['UPLOAD_FOLDER']
-                os.makedirs(upload_dir, exist_ok=True)
-                file.save(os.path.join(upload_dir, filename))
-                qr_image_path = f"uploads/{filename}"
+                qr_image_path = upload_image(file, filename)
 
         tutor = Tutor(
             name=name,

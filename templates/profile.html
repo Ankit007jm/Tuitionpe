@@ -15,7 +15,7 @@
         <div class="relative inline-block mb-3">
             <div class="w-24 h-24 gradient-accent rounded-2xl flex items-center justify-center avatar mx-auto" id="profileAvatar">
                 {% if current_user.profile_image %}
-                <img src="{{ url_for('static', filename=current_user.profile_image.replace('static/', '').lstrip('/')) }}" alt="" class="rounded-2xl">
+                <img src="{{ current_user.profile_image | img_url }}" alt="" class="rounded-2xl">
                 {% else %}
                 <span class="text-3xl font-bold">{{ current_user.name[0] }}</span>
                 {% endif %}
@@ -224,7 +224,7 @@
         </h3>
         {% if current_user.qr_image_path %}
         <div class="w-32 h-32 mx-auto mb-3 rounded-xl overflow-hidden bg-white p-2">
-            <img src="{{ url_for('static', filename=current_user.qr_image_path.replace('static/', '').lstrip('/')) }}" alt="QR Code" class="w-full h-full object-contain">
+            <img src="{{ current_user.qr_image_path | img_url }}" alt="QR Code" class="w-full h-full object-contain">
         </div>
         {% endif %}
         <form method="POST" action="{{ url_for('profile.upload_qr') }}" enctype="multipart/form-data" class="text-center">

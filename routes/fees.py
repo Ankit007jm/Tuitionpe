@@ -1,4 +1,5 @@
 import urllib.parse
+import threading
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from models import db, Student, Payment
@@ -224,22 +225,38 @@ def receipt_options(id):
         payment=payment, student=student, month_display=month_display)
 
 
+def _send_receipt_bg(app, tutor_id, student_id, payment_id):
+    """Send receipt email in a background thread with its own app context."""
+    with app.app_context():
+        from models import Tutor
+        from receipt import send_receipt_email
+        tutor = Tutor.query.get(tutor_id)
+        student = Student.query.get(student_id)
+        payment = Payment.query.get(payment_id)
+        if tutor and student and payment:
+            ok, msg = send_receipt_email(app, tutor, student, payment)
+            print(f"[TuitionPe] Receipt email {'sent' if ok else 'FAILED'}: {msg}")
+
+
 @fees_bp.route('/fees/<int:id>/receipt/email', methods=['POST'])
 @login_required
 def send_receipt_email_route(id):
-    """Send receipt PDF via email to the tutor."""
+    """Send receipt PDF via email to the tutor (async to avoid request timeout)."""
     payment = Payment.query.filter_by(id=id, tutor_id=current_user.id).first_or_404()
     student = Student.query.get(payment.student_id)
 
-    from receipt import send_receipt_email
     from flask import current_app
-    success, message = send_receipt_email(current_app._get_current_object(), current_user, student, payment)
+    app = current_app._get_current_object()
+    tutor_email = current_user.email
 
-    if success:
-        flash(f'Receipt sent to {current_user.email}!', 'success')
-    else:
-        flash(message, 'error')
+    t = threading.Thread(
+        target=_send_receipt_bg,
+        args=(app, current_user.id, student.id, payment.id),
+        daemon=True
+    )
+    t.start()
 
+    flash(f'Receipt is being sent to {tutor_email}! Check your inbox in a moment.', 'success')
     month = payment.month_year[:7]
     return redirect(url_for('fees.fees', month=month))
 

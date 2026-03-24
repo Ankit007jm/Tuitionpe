@@ -64,12 +64,9 @@ def upload_avatar():
     file = request.files['avatar']
     if file and file.filename:
         from werkzeug.utils import secure_filename
+        from utils import upload_image
         filename = secure_filename(f"avatar_{current_user.id}_{file.filename}")
-        upload_dir = current_app.config['UPLOAD_FOLDER']
-        os.makedirs(upload_dir, exist_ok=True)
-        file.save(os.path.join(upload_dir, filename))
-        # Store relative path for url_for('static', filename=...)
-        current_user.profile_image = f"uploads/{filename}"
+        current_user.profile_image = upload_image(file, filename)
         db.session.commit()
         flash('Profile photo updated!', 'success')
     return redirect(url_for('profile.profile'))
@@ -83,12 +80,9 @@ def upload_qr():
     file = request.files['qr_image']
     if file and file.filename:
         from werkzeug.utils import secure_filename
+        from utils import upload_image
         filename = secure_filename(f"qr_{current_user.id}_{file.filename}")
-        upload_dir = current_app.config['UPLOAD_FOLDER']
-        os.makedirs(upload_dir, exist_ok=True)
-        file.save(os.path.join(upload_dir, filename))
-        # Store relative path for url_for('static', filename=...)
-        current_user.qr_image_path = f"uploads/{filename}"
+        current_user.qr_image_path = upload_image(file, filename)
         db.session.commit()
         flash('QR code updated!', 'success')
     return redirect(url_for('profile.profile'))
