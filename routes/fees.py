@@ -241,13 +241,19 @@ def _send_receipt_bg(app, tutor_id, student_id, payment_id):
 @fees_bp.route('/fees/<int:id>/receipt/email', methods=['POST'])
 @login_required
 def send_receipt_email_route(id):
-    """Send receipt PDF via email to the tutor (async to avoid request timeout)."""
+    """Send receipt PDF via email to the parent (async to avoid request timeout)."""
     payment = Payment.query.filter_by(id=id, tutor_id=current_user.id).first_or_404()
     student = Student.query.get(payment.student_id)
 
+    # Validate parent email exists
+    if not student.parent_email:
+        flash(f'Parent email not set for {student.student_name}. Update student details first.', 'error')
+        month = payment.month_year[:7]
+        return redirect(url_for('fees.fees', month=month))
+
     from flask import current_app
     app = current_app._get_current_object()
-    tutor_email = current_user.email
+    parent_email = student.parent_email
 
     t = threading.Thread(
         target=_send_receipt_bg,
@@ -256,7 +262,7 @@ def send_receipt_email_route(id):
     )
     t.start()
 
-    flash(f'Receipt is being sent to {tutor_email}! Check your inbox in a moment.', 'success')
+    flash(f'Receipt is being sent to {parent_email}! Check your inbox in a moment.', 'success')
     month = payment.month_year[:7]
     return redirect(url_for('fees.fees', month=month))
 
