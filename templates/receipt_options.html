@@ -57,7 +57,8 @@
     <!-- Send Options -->
     <h3 class="font-semibold text-sm mb-4 text-gray-400 uppercase tracking-wider">Send Receipt</h3>
     <div class="space-y-3">
-        <!-- Email Option -->
+        <!-- Email Option — only shown if parent email is set -->
+        {% if student.parent_email %}
         <form method="POST" action="{{ url_for('fees.send_receipt_email_route', id=payment.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all text-left">
@@ -66,17 +67,12 @@
                 </div>
                 <div class="flex-1">
                     <div class="font-semibold text-sm">Send via Email</div>
-                    <div class="text-gray-500 text-xs mt-0.5">
-                        {% if current_user.email %}
-                        Receipt PDF will be sent to {{ current_user.email }}
-                        {% else %}
-                        <span class="text-red-400">Email not set — update in Profile first</span>
-                        {% endif %}
-                    </div>
+                    <div class="text-gray-500 text-xs mt-0.5">Receipt PDF will be sent to {{ student.parent_email }}</div>
                 </div>
                 <i class="fas fa-chevron-right text-gray-600"></i>
             </button>
         </form>
+        {% endif %}
 
         <!-- WhatsApp Option -->
         <a href="{{ url_for('fees.send_receipt_whatsapp', id=payment.id) }}" target="_blank"

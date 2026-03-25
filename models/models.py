@@ -41,6 +41,7 @@ class Student(db.Model):
     class_grade = db.Column(db.String(20))
     parent_name = db.Column(db.String(100))
     parent_phone = db.Column(db.String(15), nullable=False)
+    parent_email = db.Column(db.String(100))
     subject = db.Column(db.String(200))
     fee_amount = db.Column(db.Float, nullable=False)
     payment_cycle = db.Column(db.String(20), default='monthly')

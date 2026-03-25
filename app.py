@@ -105,6 +105,10 @@ with app.app_context():
             if 'pay_token' not in existing:
                 cursor.execute("ALTER TABLE tutors ADD COLUMN pay_token VARCHAR(32)")
 
+            stu_cols = [row[1] for row in cursor.execute("PRAGMA table_info(students)").fetchall()]
+            if 'parent_email' not in stu_cols:
+                cursor.execute("ALTER TABLE students ADD COLUMN parent_email VARCHAR(100)")
+
             pay_cols = [row[1] for row in cursor.execute("PRAGMA table_info(payments)").fetchall()]
             if 'due_date' not in pay_cols:
                 cursor.execute("ALTER TABLE payments ADD COLUMN due_date DATE")

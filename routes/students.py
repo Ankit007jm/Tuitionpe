@@ -84,6 +84,7 @@ def add_student():
         subject = ','.join(subject_list) if subject_list else request.form.get('subject', '')
         parent_name = request.form.get('parent_name', '').strip()
         parent_phone = request.form.get('parent_phone', '').strip()
+        parent_email = request.form.get('parent_email', '').strip()
         fee_amount = request.form.get('fee_amount', '0').strip()
         payment_cycle = request.form.get('payment_cycle', 'monthly')
         student_type = request.form.get('student_type', 'regular')
@@ -132,6 +133,7 @@ def add_student():
             class_grade=class_grade,
             parent_name=parent_name,
             parent_phone=parent_phone,
+            parent_email=parent_email or None,
             subject=subject,
             fee_amount=fee_val,
             payment_cycle=payment_cycle,
@@ -200,6 +202,7 @@ def edit_student(id):
         student.subject = ','.join(subject_list) if subject_list else request.form.get('subject', student.subject)
         student.parent_name = request.form.get('parent_name', student.parent_name).strip()
         student.parent_phone = parent_phone
+        student.parent_email = request.form.get('parent_email', '').strip() or None
         student.fee_amount = fee_val
         student.payment_cycle = request.form.get('payment_cycle', student.payment_cycle)
         student.student_type = request.form.get('student_type', student.student_type)

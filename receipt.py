@@ -90,6 +90,8 @@ class ReceiptPDF(FPDF if HAS_FPDF else object):
 
     def build(self):
         self.add_page()
+        self.set_left_margin(20)
+        self.set_right_margin(20)
         self.set_auto_page_break(auto=True, margin=35)
 
         # Receipt info row
@@ -161,11 +163,11 @@ class ReceiptPDF(FPDF if HAS_FPDF else object):
                 self.set_font('Helvetica', 'B', 10)
             self.cell(90, 8, val, align='R', fill=True, new_x="LMARGIN", new_y="NEXT")
 
-        # Border around table
+        # Border around table — top aligned with header, bottom aligned with last row
         table_x = 20
-        table_y = self.get_y() - (len(rows) + 1) * 8 - 9
+        table_y = self.get_y() - len(rows) * 8 - 9
         self.set_draw_color(229, 231, 235)
-        self.rect(table_x, table_y, 170, (len(rows) + 1) * 8 + 1)
+        self.rect(table_x, table_y, 170, len(rows) * 8 + 9)
 
         self.ln(12)
 
@@ -381,8 +383,8 @@ def send_receipt_email(app, tutor, student, payment):
     if not cfg.get('MAIL_USERNAME') or not cfg.get('MAIL_PASSWORD'):
         return False, 'Email not configured. Set MAIL_USERNAME and MAIL_PASSWORD in .env'
 
-    if not tutor.email:
-        return False, 'Your email address is not set. Please update it in Profile.'
+    if not student.parent_email:
+        return False, 'Parent email is not set for this student.'
 
     pdf_bytes = generate_receipt_pdf(tutor, student, payment)
 
@@ -405,11 +407,11 @@ def send_receipt_email(app, tutor, student, payment):
     </div>
     <div style="background:#ffffff;padding:28px 24px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
       <p style="color:#374151;font-size:15px;margin:0 0 20px;">
-        Hello <strong>{tutor.name.split()[0]}</strong>,
+        Dear <strong>{student.parent_name or 'Parent'}</strong>,
       </p>
       <p style="color:#6b7280;font-size:14px;margin:0 0 24px;line-height:1.6;">
-        Payment has been recorded for <strong style="color:#111;">{student.student_name}</strong>.
-        The receipt is attached as a PDF. Here is a quick summary:
+        The tuition fee payment for <strong style="color:#111;">{student.student_name}</strong> has been recorded by <strong style="color:#111;">{tutor.name}</strong>.
+        Please find the receipt attached as a PDF.
       </p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:24px;">
         <table style="width:100%;border-collapse:collapse;">
@@ -444,7 +446,7 @@ def send_receipt_email(app, tutor, student, payment):
     msg = MIMEMultipart('mixed')
     msg['Subject'] = f'Payment Receipt - {student.student_name} ({month_display})'
     msg['From'] = cfg['MAIL_DEFAULT_SENDER']
-    msg['To'] = tutor.email
+    msg['To'] = student.parent_email
 
     html_part = MIMEMultipart('alternative')
     html_part.attach(MIMEText(html_body, 'html'))
@@ -463,8 +465,8 @@ def send_receipt_email(app, tutor, student, payment):
         server.ehlo()
         server.starttls()
         server.login(cfg['MAIL_USERNAME'], cfg['MAIL_PASSWORD'])
-        server.sendmail(cfg['MAIL_USERNAME'], tutor.email, msg.as_string())
+        server.sendmail(cfg['MAIL_USERNAME'], student.parent_email, msg.as_string())
         server.quit()
-        return True, f'Receipt sent to {tutor.email}'
+        return True, f'Receipt sent to {student.parent_email}'
     except Exception as e:
         return False, f'Failed to send email: {str(e)}'
