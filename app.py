@@ -126,6 +126,17 @@ with app.app_context():
         except Exception as e:
             print(f"[TuitionPe] SQLite migration note: {e}")
 
+    # All databases: add missing columns using ALTER TABLE IF NOT EXISTS (PostgreSQL + SQLite)
+    try:
+        from sqlalchemy import text, inspect
+        inspector = inspect(db.engine)
+        stu_cols = [c['name'] for c in inspector.get_columns('students')]
+        if 'parent_email' not in stu_cols:
+            db.session.execute(text('ALTER TABLE students ADD COLUMN parent_email VARCHAR(100)'))
+            db.session.commit()
+    except Exception as e:
+        print(f"[TuitionPe] Column migration note: {e}")
+
     # All databases: auto-mark overdue payments
     try:
         from datetime import datetime
