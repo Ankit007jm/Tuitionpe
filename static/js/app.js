@@ -289,3 +289,123 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 4000);
     });
 });
+
+// ========== MILKINSIDE-STYLE ANIMATIONS ==========
+
+// 1. Custom cursor — disabled (default cursor restored)
+
+// 2. Scroll-triggered reveal via IntersectionObserver
+function initScrollReveal() {
+    const SKIP = '.sidebar, .bottom-nav, .loading-screen, .toast, .modal-overlay, [data-sr-skip]';
+
+    // Auto-tag revelable elements that aren't already tagged
+    const targets = document.querySelectorAll('.card-dark, .stat-card, .flash-message');
+    targets.forEach((el, i) => {
+        if (el.closest(SKIP) || el.hasAttribute('data-sr')) return;
+        el.setAttribute('data-sr', '');
+        // Stagger within siblings — use index mod 6 for variety
+        el.style.transitionDelay = (i % 6) * 0.07 + 's';
+    });
+
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('sr-in');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
+
+    document.querySelectorAll('[data-sr]').forEach(el => {
+        if (!el.closest(SKIP)) observer.observe(el);
+    });
+}
+
+// 3. Text mask reveal — word-by-word slide-up for h1 elements
+function initTextReveal() {
+    document.querySelectorAll('h1').forEach(el => {
+        // Skip if already processed or contains child elements with structure
+        if (el.dataset.trDone || el.querySelector('span, a, i')) return;
+        el.dataset.trDone = '1';
+
+        const text = el.textContent.trim();
+        if (!text) return;
+        const words = text.split(/\s+/);
+        el.innerHTML = words.map((w, i) =>
+            `<span class="reveal-clip" style="margin-right:0.25em"><span class="reveal-clip-inner" style="--reveal-delay:${i * 0.08}s">${w}</span></span>`
+        ).join('');
+
+        requestAnimationFrame(() => setTimeout(() => {
+            el.querySelectorAll('.reveal-clip-inner').forEach(s => s.classList.add('revealed'));
+        }, 120));
+    });
+}
+
+// 4. Magnetic button — button drifts toward cursor on hover
+function initMagneticButtons() {
+    document.querySelectorAll('.btn-primary, .btn-outline').forEach(btn => {
+        btn.addEventListener('mousemove', e => {
+            const r  = btn.getBoundingClientRect();
+            const dx = (e.clientX - (r.left + r.width  / 2)) * 0.28;
+            const dy = (e.clientY - (r.top  + r.height / 2)) * 0.28;
+            btn.style.transform = `translate(${dx}px, ${dy}px)`;
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.transform = '';
+        });
+    });
+}
+
+// 5. Soft page fade transition — gentle opacity fade, no overlay
+function initPageTransition() {
+    // Entrance: ensure page starts at full opacity (in case browser cached an exit state)
+    document.body.style.opacity = '';
+
+    let navigating = false;
+    document.addEventListener('click', e => {
+        if (navigating) return;
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('http') ||
+            link.target === '_blank' || href.startsWith('mailto') ||
+            href.startsWith('tel') || href.startsWith('whatsapp')) return;
+        if (link.dataset.noFade !== undefined) return;
+
+        e.preventDefault();
+        navigating = true;
+        document.body.style.transition = 'opacity 0.22s ease';
+        document.body.style.opacity = '0';
+        setTimeout(() => { window.location.href = href; }, 220);
+    });
+}
+
+// 6. Parallax orb — subtle movement on mouse move
+function initOrbParallax() {
+    const orbs = document.querySelectorAll('.glow-orb');
+    if (!orbs.length) return;
+    let tx = 0, ty = 0;
+    document.addEventListener('mousemove', e => {
+        tx = (e.clientX / window.innerWidth  - 0.5) * 30;
+        ty = (e.clientY / window.innerHeight - 0.5) * 20;
+    });
+    let cx = 0, cy = 0;
+    (function loop() {
+        cx += (tx - cx) * 0.04;
+        cy += (ty - cy) * 0.04;
+        orbs.forEach((o, i) => {
+            const dir = i % 2 === 0 ? 1 : -1;
+            o.style.transform = `translate(${cx * dir}px, ${cy * dir}px)`;
+        });
+        requestAnimationFrame(loop);
+    })();
+}
+
+// Boot all animations
+document.addEventListener('DOMContentLoaded', () => {
+    initScrollReveal();
+    initTextReveal();
+    initMagneticButtons();
+    initPageTransition();
+    initOrbParallax();
+});

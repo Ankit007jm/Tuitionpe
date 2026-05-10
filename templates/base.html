@@ -15,7 +15,7 @@
                 extend: {
                     fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
                     colors: {
-                        dark: { 900: '#050505', 800: '#0a0a0a', 700: '#121212', 600: '#1a1a1a', 500: '#222222' },
+                        dark: { 900: '#080808', 800: '#0f0f0f', 700: '#141414', 600: '#1a1a1a', 500: '#202020' },
                         accent: { DEFAULT: '#10b981', light: '#34d399', dark: '#059669' }
                     }
                 }
@@ -23,11 +23,18 @@
         }
     </script>
 </head>
+<script>
+    // Apply saved theme BEFORE paint to avoid flash
+    (function() {
+        var t = localStorage.getItem('tp_theme') || 'dark';
+        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    })();
+</script>
 <body class="min-h-screen text-white bg-dark-900">
     <!-- Loading Screen — only on first visit per session -->
     <div class="loading-screen" id="loading" style="display:none;">
         <div class="loader-ring"></div>
-        <p class="loading-text">TUITIONPE</p>
+        <p class="loading-text">TUITION<span style="opacity:0.4">PE</span></p>
     </div>
     <script>
         (function() {
@@ -37,25 +44,23 @@
         })();
     </script>
 
-    <!-- Twinkling Stars Background -->
+    <!-- Ambient Background -->
     <div class="stars-bg" id="starsBg">
-        <!-- Green glow orbs for ambient light -->
-        <div class="glow-orb" style="width:400px;height:400px;background:#10b981;top:-100px;right:-100px;"></div>
-        <div class="glow-orb" style="width:300px;height:300px;background:#059669;bottom:10%;left:-80px;"></div>
-        <div class="glow-orb" style="width:200px;height:200px;background:#10b981;top:50%;right:20%;"></div>
+        <div class="glow-orb" style="width:600px;height:600px;background:#10b981;top:-200px;right:-150px;"></div>
+        <div class="glow-orb" style="width:400px;height:400px;background:#10b981;bottom:0;left:-150px;opacity:0.02;"></div>
     </div>
     <script>
-        // Generate twinkling stars dynamically
+        // Very subtle star field
         (function() {
             var bg = document.getElementById('starsBg');
             if (!bg) return;
-            for (var i = 0; i < 80; i++) {
+            for (var i = 0; i < 35; i++) {
                 var s = document.createElement('div');
-                s.className = 'star' + (Math.random() > 0.85 ? ' large' : '');
+                s.className = 'star' + (Math.random() > 0.8 ? ' large' : '');
                 s.style.left = Math.random() * 100 + '%';
                 s.style.top = Math.random() * 100 + '%';
-                s.style.setProperty('--dur', (2 + Math.random() * 4) + 's');
-                s.style.setProperty('--delay', (Math.random() * 3) + 's');
+                s.style.setProperty('--dur', (4 + Math.random() * 6) + 's');
+                s.style.setProperty('--delay', (Math.random() * 5) + 's');
                 bg.appendChild(s);
             }
         })();
@@ -124,6 +129,45 @@
             const modal = document.getElementById('comingSoonModal');
             if (modal) modal.classList.remove('active');
         }
+    </script>
+    <script>
+    // Theme toggle logic
+    function getTheme() { return localStorage.getItem('tp_theme') || 'dark'; }
+
+    function applyTheme(theme) {
+        if (theme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        localStorage.setItem('tp_theme', theme);
+        updateThemeUI(theme);
+    }
+
+    function toggleTheme() {
+        var current = getTheme();
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    function updateThemeUI(theme) {
+        var track = document.getElementById('themeToggle');
+        var label = document.getElementById('themeLabel');
+        var icon = document.getElementById('themeIcon');
+        if (track) {
+            if (theme === 'light') {
+                track.classList.add('light');
+            } else {
+                track.classList.remove('light');
+            }
+        }
+        if (label) label.textContent = theme === 'light' ? 'Light mode' : 'Dark mode';
+        if (icon) icon.textContent = theme === 'light' ? '\u2600' : '\uD83C\uDF19';
+    }
+
+    // Init theme UI on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateThemeUI(getTheme());
+    });
     </script>
     {% block scripts %}{% endblock %}
 </body>
