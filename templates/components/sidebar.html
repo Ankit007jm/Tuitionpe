@@ -42,6 +42,14 @@
         </a>
     </nav>
 
+    <!-- Quick theme toggle -->
+    <div class="sidebar-theme">
+        <button type="button" class="theme-quick" onclick="toggleTheme()" aria-label="Toggle light/dark theme">
+            <i class="fas fa-moon theme-quick-icon"></i>
+            <span class="theme-quick-label">Dark mode</span>
+        </button>
+    </div>
+
     <!-- Profile Card at bottom -->
     <div class="sidebar-profile">
         <a href="{{ url_for('profile.profile') }}" class="profile-card">

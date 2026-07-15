@@ -180,6 +180,22 @@ body {
     [data-theme="dark"] .sidebar-nav a.active { color: var(--accent); }
     .sidebar-nav a.active i { background: var(--accent); color: #fff; }
     [data-theme="dark"] .sidebar-nav a.active i { color: #0b1210; }
+    .sidebar-theme { padding: 0 14px 10px; }
+    .theme-quick {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        padding: 10px 12px; border-radius: 10px; border: none; cursor: pointer;
+        background: transparent; color: var(--text-secondary);
+        font-size: 13.5px; font-weight: 600; font-family: inherit;
+        transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+    .theme-quick:hover { background: var(--bg-subtle); color: var(--text-primary); }
+    .theme-quick i {
+        width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--bg-subtle); color: var(--text-muted); flex-shrink: 0;
+        transition: transform var(--dur-med) var(--ease-spring);
+    }
+    .theme-quick:hover i { color: var(--accent); transform: rotate(-15deg); }
     .sidebar-profile { padding: 14px 14px 0; border-top: 1px solid var(--border-default); margin-top: auto; }
     .sidebar-profile .profile-card {
         display: flex; align-items: center; gap: 10px; padding: 10px 12px;
@@ -351,6 +367,16 @@ body {
     min-height: 40px;
 }
 .btn-danger:hover { border-color: var(--danger); }
+
+/* Click ripple (spawned by initRipples in app.js) */
+.btn-primary, .btn-outline { position: relative; overflow: hidden; }
+.ripple {
+    position: absolute; border-radius: 50%; transform: scale(0);
+    background: rgba(255, 255, 255, 0.4); pointer-events: none;
+    animation: ripple 0.55s ease-out forwards;
+}
+.btn-outline .ripple { background: var(--accent-tint-strong); }
+@keyframes ripple { to { transform: scale(3.4); opacity: 0; } }
 
 /* ============= AVATAR ============= */
 .avatar {

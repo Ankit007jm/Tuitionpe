@@ -385,12 +385,41 @@ function initPageTransition() {
     });
 }
 
+// 5. Click ripple on buttons
+function initRipples() {
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.btn-primary, .btn-outline');
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        const d = Math.max(r.width, r.height);
+        const s = document.createElement('span');
+        s.className = 'ripple';
+        s.style.width = s.style.height = d + 'px';
+        s.style.left = (e.clientX - r.left - d / 2) + 'px';
+        s.style.top = (e.clientY - r.top - d / 2) + 'px';
+        btn.appendChild(s);
+        setTimeout(() => s.remove(), 600);
+    });
+}
+
+// 6. Animate progress bars from 0 to their target width on load
+function initProgressBars() {
+    document.querySelectorAll('.progress-bar').forEach(bar => {
+        const target = bar.style.width;
+        if (!target) return;
+        bar.style.width = '0%';
+        requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = target; }));
+    });
+}
+
 // Boot all animations
 document.addEventListener('DOMContentLoaded', () => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduced) {
         initScrollReveal();
         initTextReveal();
+        initRipples();
+        initProgressBars();
     }
     initPageTransition();
 });

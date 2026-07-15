@@ -1,4 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+import secrets
+import requests as http_requests
 
 from flask_login import login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -128,6 +130,103 @@ def login():
         return redirect(url_for('auth.login'))
     return render_template('auth/login.html')
 
+# ─────────────────────────────────────────────
+# Google OAuth 2.0 login
+# Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars.
+# Existing tutors are matched by email; new users are sent to
+# signup with name/email prefilled (phone + password still needed).
+# ─────────────────────────────────────────────
+GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
+GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
+
+
+def _google_creds():
+    return os.environ.get('GOOGLE_CLIENT_ID'), os.environ.get('GOOGLE_CLIENT_SECRET')
+
+
+@auth_bp.route('/login/google')
+def google_login():
+    client_id, client_secret = _google_creds()
+    if not client_id or not client_secret:
+        flash('Google login is not configured on this server yet. Please sign in with your phone number.', 'info')
+        return redirect(url_for('auth.login'))
+
+    state = secrets.token_urlsafe(24)
+    session['google_oauth_state'] = state
+    from urllib.parse import urlencode
+    params = urlencode({
+        'client_id': client_id,
+        'redirect_uri': url_for('auth.google_callback', _external=True),
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'prompt': 'select_account',
+    })
+    return redirect(f'{GOOGLE_AUTH_URL}?{params}')
+
+
+@auth_bp.route('/login/google/callback')
+def google_callback():
+    client_id, client_secret = _google_creds()
+    if not client_id or not client_secret:
+        return redirect(url_for('auth.login'))
+
+    # CSRF protection: state must match what we issued
+    state = request.args.get('state', '')
+    if not state or state != session.pop('google_oauth_state', None):
+        flash('Google sign-in session expired. Please try again.', 'error')
+        return redirect(url_for('auth.login'))
+
+    if request.args.get('error'):
+        flash('Google sign-in was cancelled.', 'info')
+        return redirect(url_for('auth.login'))
+
+    code = request.args.get('code')
+    if not code:
+        flash('Google sign-in failed. Please try again.', 'error')
+        return redirect(url_for('auth.login'))
+
+    try:
+        token_resp = http_requests.post(GOOGLE_TOKEN_URL, data={
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': url_for('auth.google_callback', _external=True),
+            'grant_type': 'authorization_code',
+        }, timeout=10)
+        token_resp.raise_for_status()
+        access_token = token_resp.json().get('access_token')
+
+        info_resp = http_requests.get(
+            GOOGLE_USERINFO_URL,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10,
+        )
+        info_resp.raise_for_status()
+        info = info_resp.json()
+    except Exception:
+        current_app.logger.exception('Google OAuth token/userinfo exchange failed')
+        flash('Could not reach Google. Please try again.', 'error')
+        return redirect(url_for('auth.login'))
+
+    email = (info.get('email') or '').strip().lower()
+    if not email or not info.get('email_verified', False):
+        flash('Your Google account has no verified email, so we cannot sign you in with it.', 'error')
+        return redirect(url_for('auth.login'))
+
+    tutor = Tutor.query.filter(db.func.lower(Tutor.email) == email).first()
+    if tutor:
+        login_user(tutor, remember=True)
+        flash(f'Welcome back, {tutor.name.split()[0]}!', 'success')
+        return redirect(url_for('dashboard.dashboard'))
+
+    # New user — hand off to signup with prefilled details
+    session['google_prefill'] = {'name': info.get('name', ''), 'email': email}
+    flash('Almost there! Complete your profile to finish creating your account.', 'info')
+    return redirect(url_for('auth.signup'))
+
+
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     if current_user.is_authenticated:
@@ -201,9 +300,13 @@ def signup():
         db.session.add(tutor)
         db.session.commit()
         login_user(tutor)
+        session.pop('google_prefill', None)
         flash('Account created successfully! Welcome to TuitionPe.', 'success')
         return redirect(url_for('dashboard.dashboard'))
-    return render_template('auth/signup.html')
+    prefill = session.get('google_prefill') or {}
+    return render_template('auth/signup.html',
+                           prefill_name=prefill.get('name', ''),
+                           prefill_email=prefill.get('email', ''))
 
 @auth_bp.route('/logout')
 def logout():

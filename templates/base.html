@@ -142,6 +142,15 @@
         if (icon) icon.innerHTML = theme === 'light'
             ? '<i class="fas fa-sun" style="color:#fff;font-size:10px;"></i>'
             : '<i class="fas fa-moon" style="color:#071512;font-size:10px;"></i>';
+
+        // Sidebar quick toggle: show the mode you'd switch TO
+        document.querySelectorAll('.theme-quick-icon').forEach(function(el) {
+            el.classList.toggle('fa-moon', theme === 'light');
+            el.classList.toggle('fa-sun', theme !== 'light');
+        });
+        document.querySelectorAll('.theme-quick-label').forEach(function(el) {
+            el.textContent = theme === 'light' ? 'Dark mode' : 'Light mode';
+        });
     }
 
     // Init theme UI on page load
