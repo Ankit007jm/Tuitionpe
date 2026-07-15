@@ -9,7 +9,7 @@
     </a>
 
     <!-- Success Banner -->
-    <div class="card-dark rounded-2xl p-5 mb-6 border border-accent/30" style="background:rgba(16,185,129,0.08);">
+    <div class="card-dark rounded-2xl p-5 mb-6 border border-accent/30" style="background:var(--accent-tint);">
         <div class="flex items-center gap-3 mb-3">
             <div class="w-12 h-12 gradient-accent rounded-xl flex items-center justify-center">
                 <i class="fas fa-check text-xl"></i>
@@ -62,7 +62,7 @@
         <form method="POST" action="{{ url_for('fees.send_receipt_email_route', id=payment.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all text-left">
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:var(--info-bg);color:var(--info);">
                     <i class="fas fa-envelope text-lg"></i>
                 </div>
                 <div class="flex-1">
@@ -77,7 +77,7 @@
         <!-- WhatsApp Option -->
         <a href="{{ url_for('fees.send_receipt_whatsapp', id=payment.id) }}" target="_blank"
            class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all block">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#22c55e,#16a34a);">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:var(--success-bg);color:var(--success);">
                 <i class="fab fa-whatsapp text-xl"></i>
             </div>
             <div class="flex-1">
@@ -90,7 +90,7 @@
         <!-- Download PDF -->
         <a href="{{ url_for('fees.download_receipt', id=payment.id) }}"
            class="w-full card-dark rounded-2xl p-5 flex items-center gap-4 hover:border-accent/30 border border-white/5 transition-all block">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#a855f7,#7c3aed);">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:var(--violet-bg);color:var(--violet);">
                 <i class="fas fa-file-pdf text-lg"></i>
             </div>
             <div class="flex-1">

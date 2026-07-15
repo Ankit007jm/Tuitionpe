@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from models import db, Student, Schedule, Payment, Attendance
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
+import random
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -116,6 +117,115 @@ def get_today_classes(tutor_id):
     return classes
 
 
+MOTIVATIONAL_QUOTES = {
+    'active_students': [
+        "Every student is a seed of potential — you're the gardener.",
+        "Teaching is the one profession that creates all other professions.",
+        "Great teachers don't just teach, they inspire.",
+        "A good teacher can change the trajectory of a life.",
+        "Your impact as a teacher reaches far beyond the classroom.",
+    ],
+    'today_classes': [
+        "Today is a blank page. Write a good one.",
+        "Every class is a chance to make a difference.",
+        "The best teachers teach from the heart, not from the book.",
+        "Today's preparation determines tomorrow's achievement.",
+        "Each lesson planted today will bloom in the future.",
+    ],
+    'pending_fees': [
+        "Stay consistent. Success follows persistence.",
+        "Financial discipline is the backbone of a great tuition business.",
+        "Every pending payment is a relationship to nurture.",
+        "Gentle reminders work wonders. Keep going!",
+        "A well-managed fee system builds trust with parents.",
+    ],
+    'collected_fees': [
+        "Your hard work is paying off — literally!",
+        "Consistency in collection reflects consistency in quality.",
+        "Financial growth is a sign of a thriving tuition practice.",
+        "Well done! Every rupee collected fuels your passion.",
+        "Celebrate the small wins — they add up to big success.",
+    ]
+}
+
+
+def get_active_students_detail(tutor_id):
+    """Get detailed list of active students for dashboard card."""
+    students = Student.query.filter_by(tutor_id=tutor_id, status='active')\
+        .order_by(Student.student_name).all()
+    result = []
+    for s in students:
+        initials = ''.join([w[0].upper() for w in s.student_name.split()[:2]])
+        result.append({
+            'name': s.student_name,
+            'subject': s.subject or 'Tuition',
+            'class_grade': s.class_grade or '',
+            'initials': initials,
+            'payment_cycle': s.payment_cycle,
+        })
+    return result
+
+
+def get_pending_fees_detail(tutor_id):
+    """Get detailed list of pending/overdue fees for dashboard card."""
+    current_month = datetime.now().strftime('%Y-%m')
+    payments = Payment.query.filter(
+        Payment.tutor_id == tutor_id,
+        Payment.month_year == current_month,
+        Payment.status.in_(['pending', 'overdue'])
+    ).all()
+    result = []
+    for p in payments:
+        student = Student.query.get(p.student_id)
+        if student:
+            result.append({
+                'student_name': student.student_name,
+                'amount': p.amount,
+                'status': p.status,
+                'due_date': p.due_date.strftime('%d %b') if p.due_date else '',
+            })
+    return result
+
+
+def get_collected_fees_detail(tutor_id):
+    """Get detailed list of collected fees for dashboard card."""
+    current_month = datetime.now().strftime('%Y-%m')
+    payments = Payment.query.filter(
+        Payment.tutor_id == tutor_id,
+        Payment.month_year == current_month,
+        Payment.status == 'paid'
+    ).all()
+    result = []
+    for p in payments:
+        student = Student.query.get(p.student_id)
+        if student:
+            result.append({
+                'student_name': student.student_name,
+                'amount': p.amount,
+                'paid_date': p.paid_date.strftime('%d %b') if p.paid_date else '',
+            })
+    return result
+
+
+def get_recent_payments(tutor_id, limit=10):
+    """Get recent payment activity for Monthly Collection history."""
+    payments = Payment.query.filter(
+        Payment.tutor_id == tutor_id,
+        Payment.status == 'paid'
+    ).order_by(Payment.paid_date.desc()).limit(limit).all()
+    result = []
+    for p in payments:
+        student = Student.query.get(p.student_id)
+        if student:
+            result.append({
+                'student_name': student.student_name,
+                'amount': p.amount,
+                'paid_date': p.paid_date.strftime('%d %b %Y') if p.paid_date else '',
+                'month_year': p.month_year,
+            })
+    return result
+
+
 @dashboard_bp.route('/dashboard')
 @login_required
 def dashboard():
@@ -124,9 +234,24 @@ def dashboard():
     today_classes = get_today_classes(current_user.id)
     total_expected = stats['pending_fees'] + stats['collected_fees']
     progress = int((stats['collected_fees'] / total_expected * 100)) if total_expected > 0 else 0
+
+    # Detail data for clickable cards
+    active_students_detail = get_active_students_detail(current_user.id)
+    pending_fees_detail = get_pending_fees_detail(current_user.id)
+    collected_fees_detail = get_collected_fees_detail(current_user.id)
+    recent_payments = get_recent_payments(current_user.id)
+
+    # Motivational quotes for each card
+    quotes = {k: random.choice(v) for k, v in MOTIVATIONAL_QUOTES.items()}
+
     return render_template('dashboard.html',
         stats=stats, chart_data=chart_data,
-        today_classes=today_classes, progress=progress)
+        today_classes=today_classes, progress=progress,
+        active_students_detail=active_students_detail,
+        pending_fees_detail=pending_fees_detail,
+        collected_fees_detail=collected_fees_detail,
+        recent_payments=recent_payments,
+        quotes=quotes)
 
 @dashboard_bp.route('/api/stats')
 @login_required

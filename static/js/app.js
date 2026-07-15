@@ -142,7 +142,7 @@ function updateSignupStepIndicators() {
         }
 
         if (label) {
-            label.style.color = i <= currentSignupStep ? '#10b981' : '#6b7280';
+            label.style.color = i <= currentSignupStep ? 'var(--accent-dark)' : 'var(--text-muted)';
         }
     }
 }
@@ -205,9 +205,23 @@ function toggleEdit(section) {
 }
 
 // ========== CHART INITIALIZATION ==========
+// Read design tokens so charts match the active theme
+function chartTheme() {
+    const s = getComputedStyle(document.documentElement);
+    const v = name => s.getPropertyValue(name).trim();
+    return {
+        accent: v('--accent') || '#0d9488',
+        warning: v('--warning') || '#d97706',
+        danger: v('--danger') || '#dc2626',
+        text: v('--text-muted') || '#7d8c88',
+        grid: v('--border-default') || '#e3eae8',
+    };
+}
+
 function initPaymentChart(labels, collected, pending) {
     const ctx = document.getElementById('paymentChart');
     if (!ctx) return;
+    const t = chartTheme();
     new Chart(ctx, {
         type: 'line',
         data: {
@@ -215,30 +229,32 @@ function initPaymentChart(labels, collected, pending) {
             datasets: [{
                 label: 'Collected',
                 data: collected,
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16,185,129,0.1)',
+                borderColor: t.accent,
+                backgroundColor: t.accent + '1a',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 4,
-                pointBackgroundColor: '#10b981',
+                pointRadius: 3,
+                pointBackgroundColor: t.accent,
+                borderWidth: 2,
             }, {
                 label: 'Pending',
                 data: pending,
-                borderColor: '#f97316',
-                backgroundColor: 'rgba(249,115,22,0.1)',
+                borderColor: t.warning,
+                backgroundColor: t.warning + '1a',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 4,
-                pointBackgroundColor: '#f97316',
+                pointRadius: 3,
+                pointBackgroundColor: t.warning,
+                borderWidth: 2,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 11 } } } },
+            plugins: { legend: { display: true, labels: { color: t.text, font: { size: 11, weight: 600 }, boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } } },
             scales: {
-                x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
-                y: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => '₹' + v }, grid: { color: 'rgba(255,255,255,0.03)' } }
+                x: { ticks: { color: t.text, font: { size: 10 } }, grid: { display: false } },
+                y: { ticks: { color: t.text, font: { size: 10 }, callback: v => '₹' + v }, grid: { color: t.grid }, border: { display: false } }
             }
         }
     });
@@ -247,22 +263,25 @@ function initPaymentChart(labels, collected, pending) {
 function initFeesPieChart(collected, pending, overdue) {
     const ctx = document.getElementById('feesPieChart');
     if (!ctx) return;
+    const t = chartTheme();
     new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Collected', 'Pending', 'Overdue'],
             datasets: [{
                 data: [collected, pending, overdue],
-                backgroundColor: ['#10b981', '#f97316', '#ef4444'],
+                backgroundColor: [t.accent, t.warning, t.danger],
                 borderWidth: 0,
+                borderRadius: 4,
+                spacing: 2,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '65%',
+            cutout: '68%',
             plugins: {
-                legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', padding: 16, font: { size: 11 } } }
+                legend: { display: true, position: 'bottom', labels: { color: t.text, padding: 16, font: { size: 11, weight: 600 }, boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } }
             }
         }
     });
@@ -341,25 +360,11 @@ function initTextReveal() {
     });
 }
 
-// 4. Magnetic button — button drifts toward cursor on hover
-function initMagneticButtons() {
-    document.querySelectorAll('.btn-primary, .btn-outline').forEach(btn => {
-        btn.addEventListener('mousemove', e => {
-            const r  = btn.getBoundingClientRect();
-            const dx = (e.clientX - (r.left + r.width  / 2)) * 0.28;
-            const dy = (e.clientY - (r.top  + r.height / 2)) * 0.28;
-            btn.style.transform = `translate(${dx}px, ${dy}px)`;
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.transform = '';
-        });
-    });
-}
-
-// 5. Soft page fade transition — gentle opacity fade, no overlay
+// 4. Soft page fade transition — gentle opacity fade, no overlay
 function initPageTransition() {
     // Entrance: ensure page starts at full opacity (in case browser cached an exit state)
     document.body.style.opacity = '';
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     let navigating = false;
     document.addEventListener('click', e => {
@@ -374,38 +379,18 @@ function initPageTransition() {
 
         e.preventDefault();
         navigating = true;
-        document.body.style.transition = 'opacity 0.22s ease';
+        document.body.style.transition = 'opacity 0.18s ease';
         document.body.style.opacity = '0';
-        setTimeout(() => { window.location.href = href; }, 220);
+        setTimeout(() => { window.location.href = href; }, 180);
     });
-}
-
-// 6. Parallax orb — subtle movement on mouse move
-function initOrbParallax() {
-    const orbs = document.querySelectorAll('.glow-orb');
-    if (!orbs.length) return;
-    let tx = 0, ty = 0;
-    document.addEventListener('mousemove', e => {
-        tx = (e.clientX / window.innerWidth  - 0.5) * 30;
-        ty = (e.clientY / window.innerHeight - 0.5) * 20;
-    });
-    let cx = 0, cy = 0;
-    (function loop() {
-        cx += (tx - cx) * 0.04;
-        cy += (ty - cy) * 0.04;
-        orbs.forEach((o, i) => {
-            const dir = i % 2 === 0 ? 1 : -1;
-            o.style.transform = `translate(${cx * dir}px, ${cy * dir}px)`;
-        });
-        requestAnimationFrame(loop);
-    })();
 }
 
 // Boot all animations
 document.addEventListener('DOMContentLoaded', () => {
-    initScrollReveal();
-    initTextReveal();
-    initMagneticButtons();
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduced) {
+        initScrollReveal();
+        initTextReveal();
+    }
     initPageTransition();
-    initOrbParallax();
 });

@@ -4,14 +4,14 @@
 {% block content %}
 <div class="app-container pt-6 pb-24 relative z-10">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 fade-in">
         <div>
             <p class="text-gray-500 text-sm">Classes</p>
             <h1 class="text-2xl font-bold mt-1">Schedule</h1>
         </div>
         <a href="{{ url_for('schedule.attendance_tracker') }}"
            class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80"
-           style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+           style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
             <i class="fas fa-clipboard-check"></i> Track Attendance
         </a>
     </div>
@@ -31,18 +31,25 @@
     </div>
 
     <!-- Day Summary -->
-    <div class="card-dark rounded-2xl p-4 mb-5 border-l-4" style="border-left-color: #10b981;">
+    <div class="card-dark rounded-2xl p-4 mb-5 border-l-4" style="border-left-color: var(--success);">
         <div class="flex items-center justify-between">
             <div>
                 <div class="text-sm font-medium">{{ selected_info.full_date }}</div>
                 <div class="text-gray-500 text-xs mt-1">{{ schedule_data|length }} class{{ 'es' if schedule_data|length != 1 else '' }} scheduled</div>
             </div>
             {% if schedule_data and selected_info.is_today %}
-            <a href="{{ url_for('schedule.remind_all_today') }}"
-               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-               style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
-                <i class="fab fa-whatsapp"></i> Remind All
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('schedule.remind_all_today') }}"
+                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                   style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
+                    <i class="fab fa-whatsapp"></i> All
+                </a>
+                <a href="{{ url_for('schedule.remind_all_email') }}"
+                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                   style="background:var(--info-bg); color:var(--info); border:1px solid var(--info);">
+                    <i class="fas fa-envelope"></i> Email All
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -54,7 +61,7 @@
         <div class="flex gap-4 mb-4">
             <!-- Time Column -->
             <div class="flex flex-col items-center" style="min-width: 50px;">
-                <div class="text-sm font-semibold text-emerald-500">{{ item.schedule.start_time }}</div>
+                <div class="text-sm font-semibold text-emerald-500">{{ item.schedule.start_time|format_time_12hr }}</div>
                 <div class="timeline-dot mt-2"></div>
                 {% if not loop.last %}
                 <div class="timeline-line flex-1"></div>
@@ -76,6 +83,12 @@
                            class="text-green-500 hover:text-green-400 text-xs" title="Send WhatsApp Reminder">
                             <i class="fab fa-whatsapp text-base"></i>
                         </a>
+                        {% if item.student.parent_email %}
+                        <a href="{{ url_for('schedule.remind_class_email', id=item.schedule.id) }}"
+                           class="text-blue-400 hover:text-blue-300 text-xs" title="Send Email Reminder with Google Calendar">
+                            <i class="fas fa-envelope text-base"></i>
+                        </a>
+                        {% endif %}
                         <form method="POST" action="{{ url_for('schedule.delete_schedule', id=item.schedule.id) }}" onsubmit="return confirm('Remove this class?');" class="inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="text-gray-600 hover:text-red-400 text-xs" title="Remove class">
@@ -86,7 +99,7 @@
                 </div>
                 {% if item.schedule.end_time %}
                 <div class="text-gray-600 text-xs mt-2">
-                    <i class="fas fa-clock mr-1"></i> {{ item.schedule.start_time }} - {{ item.schedule.end_time }}
+                    <i class="fas fa-clock mr-1"></i> {{ item.schedule.start_time|format_time_12hr }} - {{ item.schedule.end_time|format_time_12hr }}
                 </div>
                 {% endif %}
 
@@ -170,15 +183,43 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-gray-400 text-xs mb-1">Start Time *</label>
-                            <input type="time" name="start_time" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm" required>
+                    <!-- Start Time (12hr AM/PM) -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Start Time *</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <select id="startHour" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center" required>
+                                <option value="">Hr</option>
+                                {% for h in range(1, 13) %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
+                            </select>
+                            <select id="startMinute" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center" required>
+                                <option value="">Min</option>
+                                {% for m in range(0, 60, 5) %}<option value="{{ '%02d'|format(m) }}">{{ '%02d'|format(m) }}</option>{% endfor %}
+                            </select>
+                            <select id="startAmpm" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
                         </div>
-                        <div>
-                            <label class="block text-gray-400 text-xs mb-1">End Time</label>
-                            <input type="time" name="end_time" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm">
+                        <input type="hidden" name="start_time" id="startTimeHidden">
+                    </div>
+                    <!-- End Time (12hr AM/PM) -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">End Time</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <select id="endHour" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="">Hr</option>
+                                {% for h in range(1, 13) %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
+                            </select>
+                            <select id="endMinute" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="">Min</option>
+                                {% for m in range(0, 60, 5) %}<option value="{{ '%02d'|format(m) }}">{{ '%02d'|format(m) }}</option>{% endfor %}
+                            </select>
+                            <select id="endAmpm" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
                         </div>
+                        <input type="hidden" name="end_time" id="endTimeHidden">
                     </div>
                     <div>
                         <label class="block text-gray-400 text-xs mb-1">Type</label>
@@ -205,4 +246,48 @@
 {% block nav %}
 {% include "components/sidebar.html" %}
 {% include "components/bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Convert 12hr time selectors to 24hr HH:MM for hidden input
+function convertTo24(hourSel, minuteSel, ampmSel) {
+    var h = parseInt(hourSel.value);
+    var m = minuteSel.value;
+    var ampm = ampmSel.value;
+    if (!h || m === '') return '';
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return (h < 10 ? '0' + h : h) + ':' + m;
+}
+
+function updateHiddenTimes() {
+    var sh = document.getElementById('startHour');
+    var sm = document.getElementById('startMinute');
+    var sa = document.getElementById('startAmpm');
+    var eh = document.getElementById('endHour');
+    var em = document.getElementById('endMinute');
+    var ea = document.getElementById('endAmpm');
+    document.getElementById('startTimeHidden').value = convertTo24(sh, sm, sa);
+    document.getElementById('endTimeHidden').value = convertTo24(eh, em, ea);
+}
+
+// Attach change events
+['startHour','startMinute','startAmpm','endHour','endMinute','endAmpm'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', updateHiddenTimes);
+});
+
+// Convert 24hr to 12hr for display
+function to12hr(time24) {
+    if (!time24) return '';
+    var parts = time24.split(':');
+    var h = parseInt(parts[0]);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    if (h === 0) h = 12;
+    else if (h > 12) h -= 12;
+    return h + ':' + m + ' ' + ampm;
+}
+</script>
 {% endblock %}

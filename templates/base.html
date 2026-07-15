@@ -15,8 +15,8 @@
                 extend: {
                     fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
                     colors: {
-                        dark: { 900: '#080808', 800: '#0f0f0f', 700: '#141414', 600: '#1a1a1a', 500: '#202020' },
-                        accent: { DEFAULT: '#10b981', light: '#34d399', dark: '#059669' }
+                        dark: { 900: '#0b1210', 800: '#101a17', 700: '#15211d', 600: '#1a2824', 500: '#20302b' },
+                        accent: { DEFAULT: '#0d9488', light: '#14b8a6', dark: '#0f766e' }
                     }
                 }
             }
@@ -24,13 +24,13 @@
     </script>
 </head>
 <script>
-    // Apply saved theme BEFORE paint to avoid flash
+    // Apply saved theme BEFORE paint to avoid flash (light is the default)
     (function() {
-        var t = localStorage.getItem('tp_theme') || 'dark';
-        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        var t = localStorage.getItem('tp_theme') || 'light';
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     })();
 </script>
-<body class="min-h-screen text-white bg-dark-900">
+<body class="min-h-screen">
     <!-- Loading Screen — only on first visit per session -->
     <div class="loading-screen" id="loading" style="display:none;">
         <div class="loader-ring"></div>
@@ -40,28 +40,6 @@
         (function() {
             if (!sessionStorage.getItem('tp_loaded')) {
                 document.getElementById('loading').style.display = '';
-            }
-        })();
-    </script>
-
-    <!-- Ambient Background -->
-    <div class="stars-bg" id="starsBg">
-        <div class="glow-orb" style="width:600px;height:600px;background:#10b981;top:-200px;right:-150px;"></div>
-        <div class="glow-orb" style="width:400px;height:400px;background:#10b981;bottom:0;left:-150px;opacity:0.02;"></div>
-    </div>
-    <script>
-        // Very subtle star field
-        (function() {
-            var bg = document.getElementById('starsBg');
-            if (!bg) return;
-            for (var i = 0; i < 35; i++) {
-                var s = document.createElement('div');
-                s.className = 'star' + (Math.random() > 0.8 ? ' large' : '');
-                s.style.left = Math.random() * 100 + '%';
-                s.style.top = Math.random() * 100 + '%';
-                s.style.setProperty('--dur', (4 + Math.random() * 6) + 's');
-                s.style.setProperty('--delay', (Math.random() * 5) + 's');
-                bg.appendChild(s);
             }
         })();
     </script>
@@ -131,12 +109,12 @@
         }
     </script>
     <script>
-    // Theme toggle logic
-    function getTheme() { return localStorage.getItem('tp_theme') || 'dark'; }
+    // Theme toggle logic (light is the default)
+    function getTheme() { return localStorage.getItem('tp_theme') || 'light'; }
 
     function applyTheme(theme) {
-        if (theme === 'light') {
-            document.documentElement.setAttribute('data-theme', 'light');
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
         } else {
             document.documentElement.removeAttribute('data-theme');
         }
@@ -161,7 +139,9 @@
             }
         }
         if (label) label.textContent = theme === 'light' ? 'Light mode' : 'Dark mode';
-        if (icon) icon.textContent = theme === 'light' ? '\u2600' : '\uD83C\uDF19';
+        if (icon) icon.innerHTML = theme === 'light'
+            ? '<i class="fas fa-sun" style="color:#fff;font-size:10px;"></i>'
+            : '<i class="fas fa-moon" style="color:#071512;font-size:10px;"></i>';
     }
 
     // Init theme UI on page load

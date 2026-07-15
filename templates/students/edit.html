@@ -94,6 +94,11 @@
                     <input type="email" name="parent_email" value="{{ student.parent_email or '' }}" placeholder="parent@example.com" class="w-full input-dark rounded-xl py-3 px-3 text-white placeholder-gray-600 text-sm">
                 </div>
 
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1.5">Date of Joining</label>
+                    <input type="date" name="date_of_joining" value="{{ student.date_of_joining.isoformat() if student.date_of_joining else '' }}" class="w-full input-dark rounded-xl py-3 px-3 text-white text-sm">
+                </div>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-gray-400 text-sm mb-1.5">Fee Amount (₹) *</label>

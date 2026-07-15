@@ -49,6 +49,7 @@ class Student(db.Model):
     notes = db.Column(db.Text)
     profile_image = db.Column(db.String(255))
     status = db.Column(db.String(20), default='active')   # active / archived
+    date_of_joining = db.Column(db.Date)                   # for pro-rata fee calculation
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     schedules = db.relationship('Schedule', backref='student', lazy=True, cascade='all, delete-orphan')

@@ -86,7 +86,7 @@
                 </div>
                 <div class="detail-row">
                     <span class="label">Status</span>
-                    <span class="value" style="color:{{ '#10b981' if status == 'paid' else '#f97316' if status == 'pending' else '#ef4444' }};">
+                    <span class="value" style="color:{{ 'var(--success)' if status == 'paid' else 'var(--warning)' if status == 'pending' else 'var(--danger)' }};">
                         {{ status|capitalize }}
                     </span>
                 </div>
@@ -96,7 +96,7 @@
             <!-- QR Code -->
             {% if tutor.qr_image_path %}
             <div class="qr-section">
-                <h3><i class="fas fa-qrcode" style="color:#10b981;margin-right:6px;"></i>Scan to Pay</h3>
+                <h3><i class="fas fa-qrcode" style="color:var(--success);margin-right:6px;"></i>Scan to Pay</h3>
                 <div class="qr-hint">Scan QR code with any UPI app (GPay, PhonePe, Paytm)</div>
                 <div class="qr-box">
                     <img src="{{ tutor.qr_image_path | img_url }}" alt="Payment QR Code">
@@ -111,7 +111,7 @@
                     <div class="upi-label">UPI ID</div>
                     <div class="upi-id">{{ tutor.upi_id }}</div>
                 </div>
-                <i class="fas fa-copy" style="color:#6b7280;cursor:pointer;" onclick="navigator.clipboard.writeText('{{ tutor.upi_id }}');this.style.color='#10b981';"></i>
+                <i class="fas fa-copy" style="color:var(--text-muted);cursor:pointer;" onclick="navigator.clipboard.writeText('{{ tutor.upi_id }}');this.style.color='#10b981';"></i>
             </div>
             {% endif %}
 
@@ -126,7 +126,7 @@
             {% endif %}
 
             {% if not tutor.qr_image_path and not tutor.upi_id and not tutor.bank_account %}
-            <div style="text-align:center;padding:16px;color:#6b7280;font-size:13px;">
+            <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;">
                 <i class="fas fa-info-circle" style="margin-right:4px;"></i>
                 Please contact {{ tutor.name }} for payment details.
             </div>

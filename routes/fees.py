@@ -101,6 +101,56 @@ def _get_due_date(month_year_str):
         return None
 
 
+def calculate_prorata_amount(student, month_year_str):
+    """
+    Calculate pro-rata fee for a student based on their date_of_joining.
+
+    Logic:
+    - If no date_of_joining or joined before the month, full fee applies.
+    - If joined in the given month, fee = (remaining_days / total_days) * fee_amount.
+    - For weekly: full weekly rate (no proration within a week).
+    - For daily/per_class: full rate always (already per-unit).
+    """
+    import math
+    if not student.date_of_joining:
+        return student.fee_amount
+
+    try:
+        y, m = map(int, month_year_str.split('-'))
+    except Exception:
+        return student.fee_amount
+
+    total_days = monthrange(y, m)[1]
+    first_of_month = date(y, m, 1)
+    last_of_month = date(y, m, total_days)
+
+    # If joined before this month, full fee
+    if student.date_of_joining < first_of_month:
+        return student.fee_amount
+
+    # If joined after this month ends, no fee
+    if student.date_of_joining > last_of_month:
+        return 0.0
+
+    # Student joined mid-month
+    join_day = student.date_of_joining.day
+
+    if student.payment_cycle in ('daily', 'per_class'):
+        # These are already per-unit — no proration needed
+        return student.fee_amount
+    elif student.payment_cycle == 'weekly':
+        # Calculate remaining full weeks (ceil) from joining date
+        remaining_days = total_days - join_day + 1
+        remaining_weeks = math.ceil(remaining_days / 7)
+        total_weeks = math.ceil(total_days / 7)
+        return round(student.fee_amount * remaining_weeks / total_weeks, 2)
+    else:
+        # monthly: prorate by day
+        remaining_days = total_days - join_day + 1
+        prorata = round(student.fee_amount * remaining_days / total_days, 2)
+        return prorata
+
+
 def _generate_weekly_payments(student, month_year_str):
     """Generate weekly payment records for a month if they don't exist."""
     try:
@@ -155,10 +205,13 @@ def fees():
                 tutor_id=current_user.id, student_id=student.id, month_year=selected_month
             ).first()
             if not existing:
+                prorata_amount = calculate_prorata_amount(student, selected_month)
+                if prorata_amount <= 0:
+                    continue  # student hasn't joined yet in this month
                 p = Payment(
                     tutor_id=current_user.id,
                     student_id=student.id,
-                    amount=student.fee_amount,
+                    amount=prorata_amount,
                     month_year=selected_month,
                     due_date=_get_due_date(selected_month),
                     status='pending'
@@ -184,8 +237,11 @@ def fees():
         student = Student.query.get(p.student_id)
         if student:
             initials = ''.join([w[0].upper() for w in student.student_name.split()[:2]])
+            is_prorata = (student.fee_amount and abs(p.amount - student.fee_amount) > 0.01
+                          and p.amount < student.fee_amount)
             payment_data.append({
-                'payment': p, 'student': student, 'initials': initials
+                'payment': p, 'student': student, 'initials': initials,
+                'is_prorata': is_prorata, 'full_fee': student.fee_amount,
             })
 
     # Month display

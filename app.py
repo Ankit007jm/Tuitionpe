@@ -19,6 +19,24 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db.init_app(app)
 
 # ── Template filter: converts stored image path or Cloudinary URL → src URL ──
+@app.template_filter('format_time_12hr')
+def format_time_12hr(time_str):
+    """Convert 24hr HH:MM to 12hr format like '2:30 PM'."""
+    if not time_str:
+        return ''
+    try:
+        parts = time_str.split(':')
+        h = int(parts[0])
+        m = parts[1]
+        ampm = 'PM' if h >= 12 else 'AM'
+        if h == 0:
+            h = 12
+        elif h > 12:
+            h -= 12
+        return f'{h}:{m} {ampm}'
+    except (ValueError, IndexError):
+        return time_str
+
 @app.template_filter('img_url')
 def img_url_filter(path):
     if not path:
@@ -108,6 +126,8 @@ with app.app_context():
             stu_cols = [row[1] for row in cursor.execute("PRAGMA table_info(students)").fetchall()]
             if 'parent_email' not in stu_cols:
                 cursor.execute("ALTER TABLE students ADD COLUMN parent_email VARCHAR(100)")
+            if 'date_of_joining' not in stu_cols:
+                cursor.execute("ALTER TABLE students ADD COLUMN date_of_joining DATE")
 
             pay_cols = [row[1] for row in cursor.execute("PRAGMA table_info(payments)").fetchall()]
             if 'due_date' not in pay_cols:
@@ -133,6 +153,9 @@ with app.app_context():
         stu_cols = [c['name'] for c in inspector.get_columns('students')]
         if 'parent_email' not in stu_cols:
             db.session.execute(text('ALTER TABLE students ADD COLUMN parent_email VARCHAR(100)'))
+            db.session.commit()
+        if 'date_of_joining' not in stu_cols:
+            db.session.execute(text('ALTER TABLE students ADD COLUMN date_of_joining DATE'))
             db.session.commit()
     except Exception as e:
         print(f"[TuitionPe] Column migration note: {e}")

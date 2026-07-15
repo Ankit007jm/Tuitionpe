@@ -2,7 +2,7 @@ import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from models import db, Student, Payment, Schedule
-from datetime import datetime
+from datetime import datetime, date
 import os
 
 students_bp = Blueprint('students', __name__)
@@ -127,6 +127,15 @@ def add_student():
                 filename = secure_filename(f"student_{parent_phone}_{file.filename}")
                 profile_image = upload_image(file, filename)
 
+        # Parse date of joining
+        doj_str = request.form.get('date_of_joining', '').strip()
+        date_of_joining = None
+        if doj_str:
+            try:
+                date_of_joining = date.fromisoformat(doj_str)
+            except (ValueError, TypeError):
+                pass
+
         student = Student(
             tutor_id=current_user.id,
             student_name=name,
@@ -140,17 +149,19 @@ def add_student():
             student_type=student_type,
             notes=notes,
             profile_image=profile_image,
+            date_of_joining=date_of_joining,
         )
         db.session.add(student)
         db.session.commit()
 
-        # Create payment record for current month with due_date
+        # Create payment record for current month with due_date (pro-rata if mid-month join)
         current_month = datetime.now().strftime('%Y-%m')
-        from routes.fees import _get_due_date
+        from routes.fees import _get_due_date, calculate_prorata_amount
+        prorata_amount = calculate_prorata_amount(student, current_month)
         payment = Payment(
             tutor_id=current_user.id,
             student_id=student.id,
-            amount=fee_val,
+            amount=prorata_amount,
             month_year=current_month,
             due_date=_get_due_date(current_month),
             status='pending'
@@ -207,6 +218,13 @@ def edit_student(id):
         student.payment_cycle = request.form.get('payment_cycle', student.payment_cycle)
         student.student_type = request.form.get('student_type', student.student_type)
         student.notes = request.form.get('notes', student.notes)
+
+        doj_str = request.form.get('date_of_joining', '').strip()
+        if doj_str:
+            try:
+                student.date_of_joining = date.fromisoformat(doj_str)
+            except (ValueError, TypeError):
+                pass
 
         if 'profile_image' in request.files:
             file = request.files['profile_image']

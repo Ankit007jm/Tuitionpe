@@ -1,5 +1,6 @@
 import urllib.parse
 import io
+import threading
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, current_app
 from flask_login import login_required, current_user
 from models import db, Student, Schedule, Attendance
@@ -179,6 +180,223 @@ def remind_class(id):
     return redirect(link)
 
 
+@schedule_bp.route('/schedule/<int:id>/remind-email')
+@login_required
+def remind_class_email(id):
+    """Send an email reminder with Google Calendar link for an online class."""
+    sched = Schedule.query.filter_by(id=id, tutor_id=current_user.id).first_or_404()
+    student = Student.query.get(sched.student_id)
+    if not student:
+        flash('Student not found.', 'error')
+        return redirect(url_for('schedule.schedule'))
+
+    if not student.parent_email:
+        flash(f'No email set for {student.student_name}. Please update student details.', 'error')
+        return redirect(url_for('schedule.schedule', day=sched.day_of_week))
+
+    today = date.today()
+    today_name = today.strftime('%A')
+
+    from reminder import make_gcal_link, send_email
+
+    time_str = sched.start_time
+    if sched.end_time:
+        time_str += f' - {sched.end_time}'
+
+    gcal_link = make_gcal_link(
+        title=f"{student.student_name} - {student.subject or 'Tuition'} class with {current_user.name}",
+        date_obj=today,
+        start_time_str=sched.start_time,
+        end_time_str=sched.end_time or '',
+        details=f"{student.subject or 'Tuition'} class ({sched.class_type}) with {current_user.name}",
+        location=sched.location or ''
+    )
+
+    class_type_str = 'Online' if sched.class_type == 'online' else 'Offline'
+    location_html = ''
+    if sched.location:
+        location_html = f'<tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Location</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{sched.location}</td></tr>'
+
+    gcal_btn = ''
+    if gcal_link:
+        gcal_btn = f'''
+        <div style="text-align:center;margin-top:20px;">
+          <a href="{gcal_link}" target="_blank"
+             style="display:inline-block;background:#4285f4;color:white;
+                    border-radius:10px;padding:14px 28px;font-size:14px;font-weight:600;
+                    text-decoration:none;">
+            &#128197; Add to Google Calendar
+          </a>
+        </div>'''
+
+    html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#050505;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
+    <div style="text-align:center;margin-bottom:20px;">
+      <span style="color:#10b981;font-size:16px;font-weight:800;letter-spacing:5px;">TUITIONPE</span>
+    </div>
+    <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden;">
+      <div style="background:linear-gradient(135deg,#10b981,#059669);padding:24px;text-align:center;">
+        <p style="color:rgba(255,255,255,0.85);margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Class Reminder</p>
+        <h2 style="color:white;margin:0;font-size:20px;font-weight:700;">Upcoming Class Today</h2>
+      </div>
+      <div style="padding:24px;">
+        <p style="color:#9ca3af;font-size:13px;margin:0 0 16px;">Namaste {student.parent_name or 'Sir/Madam'},</p>
+        <p style="color:white;font-size:14px;margin:0 0 20px;">This is a reminder from <strong>{current_user.name}</strong> about today's class:</p>
+        <table style="width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:10px;overflow:hidden;">
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Student</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{student.student_name}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Subject</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{student.subject or 'Tuition'}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Time</td><td style="color:#10b981;padding:6px 12px;font-size:13px;font-weight:700;">{time_str}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Day</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{today_name}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Mode</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{class_type_str}</td></tr>
+          {location_html}
+        </table>
+        {gcal_btn}
+        <p style="color:#9ca3af;font-size:13px;margin:20px 0 0;">Please ensure {student.student_name} is ready on time.</p>
+        <p style="color:#9ca3af;font-size:13px;margin:8px 0 0;">Thank you!<br><strong style="color:white;">{current_user.name}</strong></p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:20px;">
+      <span style="color:#10b981;font-size:11px;font-weight:800;letter-spacing:3px;">TUITIONPE</span>
+      <p style="color:#374151;font-size:10px;margin:4px 0 0;">Smart Tuition Management for Modern Teachers</p>
+    </div>
+  </div>
+</body>
+</html>'''
+
+    subject = f"Class Reminder - {student.student_name} ({student.subject or 'Tuition'}) at {sched.start_time}"
+    app = current_app._get_current_object()
+    parent_email = student.parent_email
+
+    def _send_bg():
+        from reminder import send_email as rem_send_email
+        ok = rem_send_email(app, parent_email, subject, html)
+        print(f"[TuitionPe] Class email reminder {'sent' if ok else 'FAILED'} -> {parent_email}")
+
+    t = threading.Thread(target=_send_bg, daemon=True)
+    t.start()
+
+    flash(f'Email reminder with Google Calendar link sent to {parent_email}!', 'success')
+    return redirect(url_for('schedule.schedule', day=sched.day_of_week))
+
+
+@schedule_bp.route('/schedule/remind-all-email')
+@login_required
+def remind_all_email():
+    """Send email reminders to ALL today's students who have parent_email set."""
+    today_day = date.today().strftime('%A').lower()
+    schedules = Schedule.query.filter_by(
+        tutor_id=current_user.id, day_of_week=today_day, status='active'
+    ).order_by(Schedule.start_time).all()
+
+    if not schedules:
+        flash('No classes scheduled for today.', 'error')
+        return redirect(url_for('schedule.schedule'))
+
+    from reminder import make_gcal_link, send_email as rem_send_email
+    today = date.today()
+    today_name = today.strftime('%A')
+    app = current_app._get_current_object()
+    sent_count = 0
+    skip_count = 0
+
+    for sched in schedules:
+        student = Student.query.get(sched.student_id)
+        if not student or not student.parent_email:
+            skip_count += 1
+            continue
+
+        time_str = sched.start_time
+        if sched.end_time:
+            time_str += f' - {sched.end_time}'
+
+        gcal_link = make_gcal_link(
+            title=f"{student.student_name} - {student.subject or 'Tuition'} class with {current_user.name}",
+            date_obj=today,
+            start_time_str=sched.start_time,
+            end_time_str=sched.end_time or '',
+            details=f"{student.subject or 'Tuition'} class ({sched.class_type}) with {current_user.name}",
+            location=sched.location or ''
+        )
+
+        class_type_str = 'Online' if sched.class_type == 'online' else 'Offline'
+        location_html = ''
+        if sched.location:
+            location_html = f'<tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Location</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{sched.location}</td></tr>'
+
+        gcal_btn = ''
+        if gcal_link:
+            gcal_btn = f'''
+            <div style="text-align:center;margin-top:20px;">
+              <a href="{gcal_link}" target="_blank"
+                 style="display:inline-block;background:#4285f4;color:white;
+                        border-radius:10px;padding:14px 28px;font-size:14px;font-weight:600;
+                        text-decoration:none;">
+                &#128197; Add to Google Calendar
+              </a>
+            </div>'''
+
+        html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#050505;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
+    <div style="text-align:center;margin-bottom:20px;">
+      <span style="color:#10b981;font-size:16px;font-weight:800;letter-spacing:5px;">TUITIONPE</span>
+    </div>
+    <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden;">
+      <div style="background:linear-gradient(135deg,#10b981,#059669);padding:24px;text-align:center;">
+        <p style="color:rgba(255,255,255,0.85);margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Class Reminder</p>
+        <h2 style="color:white;margin:0;font-size:20px;font-weight:700;">Upcoming Class Today</h2>
+      </div>
+      <div style="padding:24px;">
+        <p style="color:#9ca3af;font-size:13px;margin:0 0 16px;">Namaste {student.parent_name or 'Sir/Madam'},</p>
+        <p style="color:white;font-size:14px;margin:0 0 20px;">This is a reminder from <strong>{current_user.name}</strong> about today's class:</p>
+        <table style="width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:10px;overflow:hidden;">
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Student</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{student.student_name}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Subject</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{student.subject or 'Tuition'}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Time</td><td style="color:#10b981;padding:6px 12px;font-size:13px;font-weight:700;">{time_str}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Day</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{today_name}</td></tr>
+          <tr><td style="color:#9ca3af;padding:6px 12px;font-size:13px;">Mode</td><td style="color:white;padding:6px 12px;font-size:13px;font-weight:600;">{class_type_str}</td></tr>
+          {location_html}
+        </table>
+        {gcal_btn}
+        <p style="color:#9ca3af;font-size:13px;margin:20px 0 0;">Please ensure {student.student_name} is ready on time.</p>
+        <p style="color:#9ca3af;font-size:13px;margin:8px 0 0;">Thank you!<br><strong style="color:white;">{current_user.name}</strong></p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:20px;">
+      <span style="color:#10b981;font-size:11px;font-weight:800;letter-spacing:3px;">TUITIONPE</span>
+      <p style="color:#374151;font-size:10px;margin:4px 0 0;">Smart Tuition Management for Modern Teachers</p>
+    </div>
+  </div>
+</body>
+</html>'''
+
+        subject = f"Class Reminder - {student.student_name} ({student.subject or 'Tuition'}) at {sched.start_time}"
+        parent_email = student.parent_email
+
+        def _send_bg(app_ctx, to_email, subj, body):
+            ok = rem_send_email(app_ctx, to_email, subj, body)
+            print(f"[TuitionPe] Bulk email {'sent' if ok else 'FAILED'} -> {to_email}")
+
+        t = threading.Thread(target=_send_bg, args=(app, parent_email, subject, html), daemon=True)
+        t.start()
+        sent_count += 1
+
+    if sent_count > 0:
+        msg = f'Email reminders sent to {sent_count} student(s)!'
+        if skip_count > 0:
+            msg += f' ({skip_count} skipped - no email set)'
+        flash(msg, 'success')
+    else:
+        flash('No students have email addresses set. Please update student details.', 'error')
+
+    return redirect(url_for('schedule.schedule'))
+
+
 @schedule_bp.route('/schedule/remind-all')
 @login_required
 def remind_all_today():
@@ -234,7 +452,10 @@ def remind_all_today():
             'student_name': student.student_name,
             'subject': student.subject or 'Tuition',
             'time': sched.start_time,
-            'link': link
+            'link': link,
+            'schedule_id': sched.id,
+            'has_email': bool(student.parent_email),
+            'class_type': sched.class_type,
         })
 
     return render_template('remind_all.html', reminder_links=reminder_links)
