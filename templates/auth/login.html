@@ -73,8 +73,8 @@
 
         <p class="text-center text-gray-600 text-xs mt-6">
             By signing in, you agree to our
-            <a href="#" onclick="showComingSoon('Terms of Service')" class="text-gray-400 hover:text-accent transition-colors">Terms</a> &
-            <a href="#" onclick="showComingSoon('Privacy Policy')" class="text-gray-400 hover:text-accent transition-colors">Privacy Policy</a>
+            <a href="{{ url_for('auth.terms') }}" class="text-gray-400 hover:text-accent transition-colors">Terms</a> &
+            <a href="{{ url_for('auth.privacy') }}" class="text-gray-400 hover:text-accent transition-colors">Privacy Policy</a>
         </p>
     </div>
 </div>

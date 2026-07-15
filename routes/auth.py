@@ -131,6 +131,19 @@ def login():
     return render_template('auth/login.html')
 
 # ─────────────────────────────────────────────
+# Legal pages
+# ─────────────────────────────────────────────
+@auth_bp.route('/terms')
+def terms():
+    return render_template('legal/terms.html')
+
+
+@auth_bp.route('/privacy')
+def privacy():
+    return render_template('legal/privacy.html')
+
+
+# ─────────────────────────────────────────────
 # Google OAuth 2.0 login
 # Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars.
 # Existing tutors are matched by email; new users are sent to

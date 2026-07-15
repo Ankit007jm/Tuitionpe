@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy{% endblock %}
+
+{% block content %}
+<div class="min-h-screen px-4 py-10 relative z-10">
+    <div class="max-w-2xl mx-auto">
+        <a href="{{ url_for('auth.login') if not current_user.is_authenticated else url_for('dashboard.dashboard') }}"
+           class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-accent mb-6 transition-colors">
+            <i class="fas fa-arrow-left text-xs"></i> Back
+        </a>
+
+        <div class="card-dark rounded-3xl p-7 sm:p-9">
+            <p class="section-label mb-2">Legal</p>
+            <h1 class="page-title mb-2">Privacy Policy</h1>
+            <p class="text-gray-500 text-sm mb-8">Last updated: 15 July 2026</p>
+
+            <div class="space-y-6 text-sm leading-relaxed text-gray-400">
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">1. What We Collect</h2>
+                    <p>Your account details (name, phone, email, teaching profile, optional payment details like UPI ID), and the records you create: students, parent contact details, schedules, attendance, and fee entries. If you sign in with Google, we receive your name and verified email from Google — never your Google password.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">2. How We Use It</h2>
+                    <p>Only to run TuitionPe for you: showing your dashboard, generating receipts and reports, and sending the reminders you trigger or schedule. We do not sell your data or use it for advertising.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">3. Messages &amp; Reminders</h2>
+                    <p>WhatsApp reminders open in your own WhatsApp with a pre-filled message — we never message parents directly. Email receipts and schedule reminders are sent from the service only when you enable or trigger them.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">4. Storage &amp; Security</h2>
+                    <p>Data is stored in our application database. Passwords are stored as salted hashes, never in plain text. Profile images may be stored with our media hosting provider (Cloudinary).</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">5. Your Control</h2>
+                    <p>You can edit or delete students and their records at any time; permanent deletion removes their payments, schedules, and attendance. To delete your entire account and data, contact us via Help &amp; Support in Settings.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">6. Cookies</h2>
+                    <p>We use a session cookie to keep you signed in and a local preference for your light/dark theme. No third-party tracking cookies.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">7. Changes</h2>
+                    <p>If this policy changes materially, we will note it on this page with a new "last updated" date.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

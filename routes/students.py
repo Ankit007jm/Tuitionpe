@@ -1,7 +1,8 @@
 import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
-from models import db, Student, Payment, Schedule
+from models import db, Student, Payment, Schedule, Attendance
+from sqlalchemy import func
 from datetime import datetime, date
 import os
 
@@ -54,13 +55,29 @@ def student_list():
 
     # Get fee status for each student
     current_month = datetime.now().strftime('%Y-%m')
+
+    # Attendance rate per student (completed vs absent; cancelled excluded)
+    att_counts = {}
+    rows = db.session.query(
+        Attendance.student_id, Attendance.status, func.count(Attendance.id)
+    ).filter(
+        Attendance.tutor_id == current_user.id,
+        Attendance.status.in_(['completed', 'absent'])
+    ).group_by(Attendance.student_id, Attendance.status).all()
+    for sid, status, count in rows:
+        att_counts.setdefault(sid, {})[status] = count
+
     student_data = []
     for s in students:
         payment = Payment.query.filter_by(
             tutor_id=current_user.id, student_id=s.id, month_year=current_month
         ).first()
         fee_status = payment.status if payment else 'pending'
-        student_data.append({'student': s, 'fee_status': fee_status})
+        counts = att_counts.get(s.id, {})
+        attended = counts.get('completed', 0)
+        held = attended + counts.get('absent', 0)
+        att_pct = round(attended / held * 100) if held else None
+        student_data.append({'student': s, 'fee_status': fee_status, 'att_pct': att_pct})
 
     # Counts for filter tabs
     total = Student.query.filter_by(tutor_id=current_user.id, status='active').count()

@@ -9,11 +9,17 @@
             <p class="text-gray-500 text-sm">Fee Analytics</p>
             <h1 class="text-2xl font-bold mt-1">Payments</h1>
         </div>
-        <!-- Month Selector -->
-        <form method="GET" action="{{ url_for('fees.fees') }}" class="flex items-center">
-            <input type="month" name="month" value="{{ selected_month }}"
-                   class="input-dark rounded-xl py-2.5 px-3 text-sm text-white" onchange="this.form.submit()">
-        </form>
+        <!-- Month Selector + Report -->
+        <div class="flex items-center gap-2">
+            <form method="GET" action="{{ url_for('fees.fees') }}" class="flex items-center">
+                <input type="month" name="month" value="{{ selected_month }}"
+                       class="input-dark rounded-xl py-2.5 px-3 text-sm text-white" onchange="this.form.submit()">
+            </form>
+            <a href="{{ url_for('fees.monthly_report', month=selected_month) }}" data-no-fade
+               class="btn-outline px-3.5 py-2.5 rounded-xl text-sm font-semibold" title="Download PDF earnings report for {{ month_display }}">
+                <i class="fas fa-file-pdf"></i><span class="hidden sm:inline ml-1.5">Report</span>
+            </a>
+        </div>
     </div>
 
     <!-- Month Display -->

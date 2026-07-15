@@ -79,6 +79,15 @@
                 <div class="text-sm">
                     <span class="font-semibold" style="background:linear-gradient(120deg,var(--accent-dark),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">₹{{ s.fee_amount|int }}</span>
                     <span class="text-gray-500">/{{ s.payment_cycle }}</span>
+                    {% if item.att_pct is not none %}
+                    {% set att_color = 'var(--success)' if item.att_pct >= 90 else ('var(--warning)' if item.att_pct >= 75 else 'var(--danger)') %}
+                    {% set att_bg = 'var(--success-bg)' if item.att_pct >= 90 else ('var(--warning-bg)' if item.att_pct >= 75 else 'var(--danger-bg)') %}
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-2"
+                          style="background:{{ att_bg }};color:{{ att_color }};"
+                          title="Attendance: classes attended vs held">
+                        <i class="fas fa-clipboard-check mr-0.5"></i>{{ item.att_pct }}%
+                    </span>
+                    {% endif %}
                     {% if s.date_of_joining %}
                     <span class="text-gray-600 text-[10px] ml-2"><i class="fas fa-calendar-alt mr-0.5"></i>{{ s.date_of_joining.strftime('%d %b %Y') }}</span>
                     {% endif %}
