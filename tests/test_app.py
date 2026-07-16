@@ -196,6 +196,43 @@ class TestAuth(BaseCase):
         self.assertEqual(self.client.get('/terms').status_code, 200)
         self.assertEqual(self.client.get('/privacy').status_code, 200)
 
+    def test_security_headers_present(self):
+        r = self.client.get('/login')
+        self.assertEqual(r.headers.get('X-Content-Type-Options'), 'nosniff')
+        self.assertEqual(r.headers.get('X-Frame-Options'), 'SAMEORIGIN')
+        self.assertIn('Referrer-Policy', r.headers)
+
+    def test_otp_never_stored_in_session_cookie(self):
+        """The session cookie is client-readable; the OTP must not be in it."""
+        auth_mod._store_otp(self.ids['tutor1'], '123456')
+        with self.client.session_transaction() as s:
+            s['reset_tutor_id'] = self.ids['tutor1']
+            s['reset_phone'] = TUTOR1['phone']
+        with self.client.session_transaction() as s:
+            self.assertNotIn('reset_otp', s)
+
+    def test_otp_attempt_limit(self):
+        auth_mod._store_otp(self.ids['tutor1'], '654321')
+        with self.client.session_transaction() as s:
+            s['reset_tutor_id'] = self.ids['tutor1']
+        token = get_csrf(self.client)
+        for _ in range(5):
+            self.client.post('/verify-otp', data={'otp': '000000', 'csrf_token': token})
+        r = self.client.post('/verify-otp', data={'otp': '654321', 'csrf_token': token},
+                             follow_redirects=True)
+        self.assertIn(b'Too many incorrect attempts', r.data)
+        # OTP record is gone — even the right code no longer works
+        self.assertNotIn(self.ids['tutor1'], auth_mod._pending_otps)
+
+    def test_otp_correct_flow(self):
+        auth_mod._store_otp(self.ids['tutor1'], '111222')
+        with self.client.session_transaction() as s:
+            s['reset_tutor_id'] = self.ids['tutor1']
+        token = get_csrf(self.client)
+        r = self.client.post('/verify-otp', data={'otp': '111222', 'csrf_token': token},
+                             follow_redirects=True)
+        self.assertIn(b'OTP verified', r.data)
+
 
 # ─────────────────────────────────────────────────────────────
 # Access control: tutor 1 must never touch tutor 2's data

@@ -3,7 +3,27 @@ import os
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'tuitionpe-secret-key-2024')
+    # In production (Render sets RENDER=true) a missing SECRET_KEY must never
+    # fall back to a value that is public in the repo — sessions would be
+    # forgeable. Use an ephemeral random key instead (sessions reset on
+    # restart) and rely on the env var being set for real deployments.
+    _env_secret = os.environ.get('SECRET_KEY')
+    if _env_secret:
+        SECRET_KEY = _env_secret
+    elif os.environ.get('RENDER') or os.environ.get('DATABASE_URL'):
+        import secrets as _secrets
+        SECRET_KEY = _secrets.token_hex(32)
+        print('[TuitionPe] WARNING: SECRET_KEY env var not set in production; '
+              'using an ephemeral key — sessions will not survive restarts.')
+    else:
+        SECRET_KEY = 'tuitionpe-dev-only-secret'
+
+    # Session cookie hardening
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = bool(os.environ.get('RENDER') or os.environ.get('FORCE_SECURE_COOKIES'))
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SECURE = bool(os.environ.get('RENDER') or os.environ.get('FORCE_SECURE_COOKIES'))
 
     # Database: use DATABASE_URL (PostgreSQL) in production, SQLite locally
     _db_url = os.environ.get('DATABASE_URL', '')

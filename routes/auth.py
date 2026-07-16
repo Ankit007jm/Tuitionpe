@@ -48,6 +48,43 @@ def _record_attempt(ip):
         _login_attempts[ip].append(datetime.now())
 
 
+# ── Server-side pending OTPs ─────────────────────────────────
+# The Flask session cookie is signed but CLIENT-READABLE, so the OTP must
+# never be stored in it (whoever triggers the reset holds that cookie).
+# Keep only a hash server-side, with expiry and an attempt cap.
+import hashlib
+
+_pending_otps = {}  # tutor_id -> {'otp_hash', 'expires', 'attempts'}
+MAX_OTP_ATTEMPTS = 5
+
+
+def _store_otp(tutor_id, otp):
+    _pending_otps[tutor_id] = {
+        'otp_hash': hashlib.sha256(otp.encode()).hexdigest(),
+        'expires': datetime.utcnow() + timedelta(minutes=10),
+        'attempts': 0,
+    }
+
+
+def _check_otp(tutor_id, entered):
+    """Returns 'ok' | 'bad' | 'expired' | 'locked' | 'missing'."""
+    rec = _pending_otps.get(tutor_id)
+    if not rec:
+        return 'missing'
+    if datetime.utcnow() > rec['expires']:
+        _pending_otps.pop(tutor_id, None)
+        return 'expired'
+    rec['attempts'] += 1
+    if rec['attempts'] > MAX_OTP_ATTEMPTS:
+        _pending_otps.pop(tutor_id, None)
+        return 'locked'
+    entered_hash = hashlib.sha256(entered.encode()).hexdigest()
+    if secrets.compare_digest(entered_hash, rec['otp_hash']):
+        _pending_otps.pop(tutor_id, None)
+        return 'ok'
+    return 'bad'
+
+
 def generate_otp():
     """Generate a 6-digit OTP."""
     return str(random.randint(100000, 999999))
@@ -185,9 +222,10 @@ def google_callback():
     if not client_id or not client_secret:
         return redirect(url_for('auth.login'))
 
-    # CSRF protection: state must match what we issued
+    # CSRF protection: state must match what we issued (timing-safe)
     state = request.args.get('state', '')
-    if not state or state != session.pop('google_oauth_state', None):
+    expected_state = session.pop('google_oauth_state', None) or ''
+    if not state or not expected_state or not secrets.compare_digest(state, expected_state):
         flash('Google sign-in session expired. Please try again.', 'error')
         return redirect(url_for('auth.login'))
 
@@ -245,6 +283,12 @@ def signup():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.dashboard'))
     if request.method == 'POST':
+        # Same per-IP throttle as login to keep bots from mass-creating accounts
+        client_ip = request.remote_addr or '0.0.0.0'
+        if _is_rate_limited(client_ip):
+            flash('Too many attempts. Please wait a few minutes and try again.', 'error')
+            return redirect(url_for('auth.signup'))
+
         name = request.form.get('name', '').strip()
         phone = request.form.get('phone', '').strip()
         email = request.form.get('email', '').strip()
@@ -312,6 +356,9 @@ def signup():
         )
         db.session.add(tutor)
         db.session.commit()
+        # Count successful creations toward the IP throttle so a bot can't
+        # mass-register; failed validation attempts stay free for humans.
+        _record_attempt(client_ip)
         login_user(tutor)
         session.pop('google_prefill', None)
         flash('Account created successfully! Welcome to TuitionPe.', 'success')
@@ -368,11 +415,10 @@ def forgot_password():
         result = send_otp_email(tutor.email, otp, tutor.name)
 
         if result is True:
-            # Store OTP in session
-            session['reset_otp'] = otp
+            # OTP hash lives server-side only; session just tracks who is resetting
+            _store_otp(tutor.id, otp)
             session['reset_phone'] = phone
             session['reset_tutor_id'] = tutor.id
-            session['reset_otp_expiry'] = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
             flash('OTP sent to your email! Check your inbox.', 'success')
             return redirect(url_for('auth.verify_otp'))
         else:
@@ -389,31 +435,29 @@ def verify_otp():
         return redirect(url_for('dashboard.dashboard'))
 
     # Must have a pending reset
-    if 'reset_otp' not in session:
+    if 'reset_tutor_id' not in session:
         flash('Please start the password reset process first.', 'error')
         return redirect(url_for('auth.forgot_password'))
 
     if request.method == 'POST':
         entered_otp = request.form.get('otp', '').strip()
+        result = _check_otp(session['reset_tutor_id'], entered_otp)
 
-        # Check expiry
-        expiry = datetime.fromisoformat(session.get('reset_otp_expiry', '2000-01-01'))
-        if datetime.utcnow() > expiry:
-            session.pop('reset_otp', None)
-            session.pop('reset_phone', None)
-            session.pop('reset_tutor_id', None)
-            session.pop('reset_otp_expiry', None)
-            flash('OTP has expired. Please request a new one.', 'error')
-            return redirect(url_for('auth.forgot_password'))
-
-        if entered_otp == session.get('reset_otp'):
-            # OTP verified — allow password reset
+        if result == 'ok':
             session['otp_verified'] = True
             flash('OTP verified! Set your new password.', 'success')
             return redirect(url_for('auth.reset_password'))
-        else:
+        if result == 'bad':
             flash('Invalid OTP. Please try again.', 'error')
             return redirect(url_for('auth.verify_otp'))
+        # expired / locked / missing — restart the flow
+        session.pop('reset_phone', None)
+        session.pop('reset_tutor_id', None)
+        if result == 'locked':
+            flash('Too many incorrect attempts. Please request a new OTP.', 'error')
+        else:
+            flash('OTP has expired. Please request a new one.', 'error')
+        return redirect(url_for('auth.forgot_password'))
 
     phone = session.get('reset_phone', '')
     return render_template('auth/verify_otp.html', phone=phone)
@@ -477,8 +521,7 @@ def resend_otp():
     result = send_otp_email(tutor.email, otp, tutor.name)
 
     if result is True:
-        session['reset_otp'] = otp
-        session['reset_otp_expiry'] = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+        _store_otp(tutor.id, otp)
         flash('New OTP sent to your email!', 'success')
     else:
         flash(result, 'error')

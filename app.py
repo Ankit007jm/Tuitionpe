@@ -48,6 +48,7 @@ def img_url_filter(path):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
+login_manager.session_protection = 'strong'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -59,15 +60,25 @@ import secrets
 
 @app.before_request
 def csrf_protect():
-    """Validate CSRF token on all POST requests."""
+    """Validate CSRF token on all POST requests (timing-safe comparison)."""
     if request.method == 'POST':
         token = session.get('csrf_token')
-        form_token = request.form.get('csrf_token')
-        if not token or token != form_token:
+        form_token = request.form.get('csrf_token') or ''
+        if not token or not secrets.compare_digest(token, form_token):
             # Allow if the token is in the header (for AJAX)
-            header_token = request.headers.get('X-CSRFToken')
-            if not token or token != header_token:
+            header_token = request.headers.get('X-CSRFToken') or ''
+            if not token or not secrets.compare_digest(token, header_token):
                 abort(400, 'CSRF token missing or invalid. Please refresh the page and try again.')
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    if os.environ.get('RENDER') or os.environ.get('FORCE_SECURE_COOKIES'):
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
 
 @app.context_processor
 def inject_csrf_token():
@@ -194,5 +205,8 @@ from reminder import init_reminders
 init_reminders(app)
 
 if __name__ == '__main__':
-    # use_reloader=False prevents APScheduler from starting twice in debug mode
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    # use_reloader=False prevents APScheduler from starting twice in debug mode.
+    # Bind to localhost by default — debug mode exposes the Werkzeug debugger
+    # (remote code execution) to anyone who can reach the port. Set
+    # HOST=0.0.0.0 explicitly to test from other devices on your network.
+    app.run(debug=True, host=os.environ.get('HOST', '127.0.0.1'), port=5000, use_reloader=False)
