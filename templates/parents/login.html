@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Parent Login{% endblock %}
+
+{% block content %}
+{% set parent = None %}
+{% include "components/parent_nav.html" %}
+
+<div class="flex items-center justify-center px-4 py-14 grid-bg relative z-10">
+    <div class="w-full auth-container mx-auto">
+        <div class="text-center mb-7">
+            <h1 class="text-3xl font-extrabold tracking-tight">Welcome back</h1>
+            <p class="text-gray-500 text-sm mt-2">Log in to track your demo requests</p>
+        </div>
+
+        <div class="card-dark rounded-3xl p-7">
+            <form method="POST" action="{{ url_for('parents.parent_login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="next" value="{{ next }}">
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Phone Number</label>
+                    <div class="flex phone-group">
+                        <span class="phone-prefix">+91</span>
+                        <input type="tel" name="phone" placeholder="10-digit number" class="phone-input" maxlength="10" pattern="[0-9]{10}" required>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-400 text-sm mb-2 font-medium">Password</label>
+                    <input type="password" name="password" required placeholder="Your password" class="input-dark rounded-xl">
+                </div>
+                <button type="submit" class="w-full btn-primary py-4 rounded-xl font-semibold">
+                    Log In <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+            <p class="text-center mt-5 text-gray-500 text-sm">
+                New here? <a href="{{ url_for('parents.parent_signup', next=next) }}" class="text-accent font-medium hover:underline">Create a free account</a>
+            </p>
+        </div>
+
+        <p class="text-center text-gray-600 text-xs mt-6">
+            Are you a teacher? <a href="{{ url_for('auth.login') }}" class="text-accent hover:underline">Teacher login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

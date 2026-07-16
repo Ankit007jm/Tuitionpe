@@ -41,6 +41,11 @@ def update_profile():
         current_user.ifsc_code = request.form.get('ifsc_code', current_user.ifsc_code)
     elif section == 'bio':
         current_user.bio = request.form.get('bio', current_user.bio)
+    elif section == 'discovery':
+        current_user.discoverable = request.form.get('discoverable') == '1'
+        current_user.city = request.form.get('city', '').strip()[:100] or None
+        mode = request.form.get('teaching_mode', 'both')
+        current_user.teaching_mode = mode if mode in ('online', 'offline', 'both') else 'both'
     elif section == 'reminder':
         current_user.daily_reminder = request.form.get('daily_reminder') == '1'
         try:

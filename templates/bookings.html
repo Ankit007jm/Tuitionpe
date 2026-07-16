@@ -56,6 +56,11 @@
                         {% if r.preferred_time %} at {{ r.preferred_time }}{% endif %}
                     </div>
                 </div>
+                {% if r.parent_id %}
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold" style="background:var(--accent-tint);color:var(--accent-dark);" title="Came from teacher search">
+                    <i class="fas fa-search mr-0.5"></i>Search
+                </span>
+                {% endif %}
                 <span class="badge {{ 'badge-pending' if r.status == 'new' else ('badge-paid' if r.status == 'contacted' else '') }}"
                       {% if r.status == 'closed' %}style="background:var(--bg-subtle);color:var(--text-muted);"{% endif %}>
                     {{ r.status|capitalize }}

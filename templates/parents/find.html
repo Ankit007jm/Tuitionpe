@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Find Teachers{% endblock %}
+
+{% block content %}
+{% include "components/parent_nav.html" %}
+
+<div class="max-w-5xl mx-auto px-4 pb-20 relative z-10">
+    <!-- Hero -->
+    <div class="text-center pt-10 pb-8">
+        <p class="section-label mb-3">Teachers near you, fast</p>
+        <h1 class="page-title mb-3">Find your perfect teacher<br><span class="text-gradient-accent">in minutes, not weeks</span></h1>
+        <p class="text-gray-500 text-sm max-w-md mx-auto">Search verified tutors by subject and class, book a free demo, and chat on WhatsApp — all in one place.</p>
+    </div>
+
+    <!-- Search / Filters -->
+    <form method="GET" action="{{ url_for('parents.find_teachers') }}"
+          class="card-dark rounded-2xl p-4 mb-4" style="animation: slideUp 0.4s ease both;">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+                <label class="block text-gray-400 text-xs mb-1.5 font-semibold">Subject</label>
+                <input type="text" name="subject" value="{{ subject }}" placeholder="e.g. Maths" class="input-dark rounded-xl text-sm">
+            </div>
+            <div>
+                <label class="block text-gray-400 text-xs mb-1.5 font-semibold">Class</label>
+                <input type="text" name="class_grade" value="{{ class_grade }}" placeholder="e.g. 10" class="input-dark rounded-xl text-sm">
+            </div>
+            <div>
+                <label class="block text-gray-400 text-xs mb-1.5 font-semibold">City</label>
+                <input type="text" name="city" value="{{ city }}" placeholder="e.g. Patna" class="input-dark rounded-xl text-sm">
+            </div>
+            <div>
+                <label class="block text-gray-400 text-xs mb-1.5 font-semibold">Mode</label>
+                <select name="mode" class="input-dark rounded-xl text-sm">
+                    <option value="">Any</option>
+                    <option value="online" {{ 'selected' if mode == 'online' }}>Online</option>
+                    <option value="offline" {{ 'selected' if mode == 'offline' }}>In person</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 mt-3">
+            <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm flex-shrink-0">
+                <i class="fas fa-search"></i> Search
+            </button>
+            {% if popular_subjects %}
+            <div class="flex gap-1.5 overflow-x-auto">
+                {% for s in popular_subjects %}
+                <a href="{{ url_for('parents.find_teachers', subject=s) }}"
+                   class="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors
+                          {{ 'btn-primary' if subject == s else '' }}"
+                   {% if subject != s %}style="background:var(--bg-subtle);color:var(--text-secondary);"{% endif %}>{{ s }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Results -->
+    {% if tutors %}
+    <p class="text-gray-500 text-xs mb-3 font-semibold">{{ tutors|length }} teacher{{ 's' if tutors|length != 1 }} found</p>
+    <div class="grid sm:grid-cols-2 gap-4">
+        {% for t in tutors %}
+        <div class="card-dark rounded-2xl p-5" style="animation: slideUp 0.4s ease both; animation-delay: {{ (loop.index0 % 6) * 0.06 }}s;">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-14 h-14 rounded-2xl gradient-accent avatar text-lg font-bold flex items-center justify-center">
+                    {% if t.profile_image %}
+                    <img src="{{ t.profile_image | img_url }}" alt="">
+                    {% else %}
+                    {{ t.name[0]|upper }}
+                    {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-bold truncate">{{ t.name }}</div>
+                    <div class="text-gray-500 text-xs">
+                        {% if t.qualification %}{{ t.qualification }}{% endif %}
+                        {% if t.experience_years %} &bull; {{ t.experience_years }}+ yrs{% endif %}
+                    </div>
+                    <div class="text-gray-500 text-xs mt-0.5">
+                        {% if t.city %}<i class="fas fa-map-marker-alt mr-1"></i>{{ t.city }}{% endif %}
+                        {% if t.teaching_mode == 'both' %} &bull; Online & In person
+                        {% elif t.teaching_mode == 'online' %} &bull; Online
+                        {% else %} &bull; In person{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% set subject_list = (t.subjects or '').split(',') | select | list %}
+            {% if subject_list %}
+            <div class="flex flex-wrap gap-1.5 mb-3">
+                {% for s in subject_list[:4] %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold" style="background:var(--accent-tint);color:var(--accent-dark);">{{ s.strip() }}</span>
+                {% endfor %}
+                {% if t.classes_taught %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold" style="background:var(--bg-subtle);color:var(--text-muted);">Class {{ t.classes_taught }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if t.bio %}
+            <p class="text-gray-500 text-xs mb-4 line-clamp-2">{{ t.bio[:140] }}{{ '…' if t.bio|length > 140 }}</p>
+            {% endif %}
+
+            {% if parent and t.id in requested_ids %}
+            <a href="{{ url_for('parents.parent_home') }}" class="w-full btn-outline py-2.5 rounded-xl text-sm block text-center">
+                <i class="fas fa-check mr-1" style="color:var(--success);"></i> Demo requested — view status
+            </a>
+            {% else %}
+            <form method="POST" action="{{ url_for('parents.request_demo', tutor_id=t.id) }}" class="flex gap-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                {% if subject_list|length > 1 %}
+                <select name="subject" class="input-dark rounded-xl text-xs flex-1" style="padding:8px 30px 8px 12px;">
+                    {% for s in subject_list %}<option value="{{ s.strip() }}">{{ s.strip() }}</option>{% endfor %}
+                </select>
+                {% else %}
+                <input type="hidden" name="subject" value="{{ subject_list[0].strip() if subject_list else '' }}">
+                {% endif %}
+                <button type="submit" class="btn-primary py-2.5 px-4 rounded-xl text-sm flex-1">
+                    <i class="fas fa-bolt"></i> Book free demo
+                </button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-dark rounded-2xl p-10 text-center" style="animation: slideUp 0.4s ease both;">
+        <i class="fas fa-user-graduate text-3xl text-gray-600 mb-3"></i>
+        <p class="text-gray-400 font-medium mb-1">No teachers match your search yet</p>
+        <p class="text-gray-600 text-sm mb-4">Try a broader subject or clear the filters</p>
+        <a href="{{ url_for('parents.find_teachers') }}" class="btn-outline px-5 py-2.5 rounded-xl text-sm">Clear filters</a>
+    </div>
+    {% endif %}
+
+    <!-- Tutor CTA -->
+    <div class="text-center mt-10">
+        <p class="text-gray-600 text-xs">Are you a teacher? <a href="{{ url_for('auth.login') }}" class="text-accent font-semibold hover:underline">Join TuitionPe</a> and get discovered by parents.</p>
+    </div>
+</div>
+{% endblock %}

@@ -97,8 +97,10 @@ from routes.fees import fees_bp
 from routes.profile import profile_bp
 from routes.payment_page import pay_bp
 from routes.booking import booking_bp
+from routes.parents import parents_bp
 
 app.register_blueprint(booking_bp)
+app.register_blueprint(parents_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(students_bp)
@@ -137,10 +139,20 @@ with app.app_context():
                 cursor.execute("ALTER TABLE tutors ADD COLUMN pay_token VARCHAR(32)")
             if 'booking_token' not in existing:
                 cursor.execute("ALTER TABLE tutors ADD COLUMN booking_token VARCHAR(32)")
+            if 'discoverable' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN discoverable BOOLEAN DEFAULT 0")
+            if 'city' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN city VARCHAR(100)")
+            if 'teaching_mode' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN teaching_mode VARCHAR(20) DEFAULT 'both'")
 
             sch_cols = [row[1] for row in cursor.execute("PRAGMA table_info(schedules)").fetchall()]
             if 'batch_name' not in sch_cols:
                 cursor.execute("ALTER TABLE schedules ADD COLUMN batch_name VARCHAR(60)")
+
+            dr_cols = [row[1] for row in cursor.execute("PRAGMA table_info(demo_requests)").fetchall()]
+            if dr_cols and 'parent_id' not in dr_cols:
+                cursor.execute("ALTER TABLE demo_requests ADD COLUMN parent_id INTEGER REFERENCES parents(id)")
 
             stu_cols = [row[1] for row in cursor.execute("PRAGMA table_info(students)").fetchall()]
             if 'parent_email' not in stu_cols:
@@ -184,6 +196,20 @@ with app.app_context():
         if 'batch_name' not in sch_cols:
             db.session.execute(text('ALTER TABLE schedules ADD COLUMN batch_name VARCHAR(60)'))
             db.session.commit()
+        if 'discoverable' not in tut_cols:
+            db.session.execute(text('ALTER TABLE tutors ADD COLUMN discoverable BOOLEAN DEFAULT FALSE'))
+            db.session.commit()
+        if 'city' not in tut_cols:
+            db.session.execute(text('ALTER TABLE tutors ADD COLUMN city VARCHAR(100)'))
+            db.session.commit()
+        if 'teaching_mode' not in tut_cols:
+            db.session.execute(text("ALTER TABLE tutors ADD COLUMN teaching_mode VARCHAR(20) DEFAULT 'both'"))
+            db.session.commit()
+        if inspector.has_table('demo_requests'):
+            dr_cols = [c['name'] for c in inspector.get_columns('demo_requests')]
+            if 'parent_id' not in dr_cols:
+                db.session.execute(text('ALTER TABLE demo_requests ADD COLUMN parent_id INTEGER'))
+                db.session.commit()
     except Exception as e:
         print(f"[TuitionPe] Column migration note: {e}")
 

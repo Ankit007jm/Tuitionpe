@@ -24,10 +24,11 @@ os.environ.pop('GOOGLE_CLIENT_SECRET', None)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app  # noqa: E402
-from models import db, Tutor, Student, Schedule, Payment, Attendance, DemoRequest  # noqa: E402
+from models import db, Tutor, Student, Schedule, Payment, Attendance, DemoRequest, Parent  # noqa: E402
 from werkzeug.security import generate_password_hash  # noqa: E402
 import routes.auth as auth_mod  # noqa: E402
 import routes.booking as booking_mod  # noqa: E402
+import routes.parents as parents_mod  # noqa: E402
 from datetime import datetime, date, timedelta  # noqa: E402
 
 TUTOR1 = {'phone': '9000000001', 'password': 'pass1secure'}
@@ -95,6 +96,7 @@ class BaseCase(unittest.TestCase):
         # Reset in-memory rate limiters between tests
         auth_mod._login_attempts.clear()
         booking_mod._submissions.clear()
+        parents_mod._attempts.clear()
         self.client = app.test_client()
 
 
@@ -560,6 +562,157 @@ class TestBooking(BaseCase):
         r = self.client.post(f'/bookings/{rid}/status',
                              data={'status': 'closed', 'csrf_token': token})
         self.assertEqual(r.status_code, 404)
+
+
+# ─────────────────────────────────────────────────────────────
+# Parent marketplace (teacher discovery)
+# ─────────────────────────────────────────────────────────────
+class TestMarketplace(BaseCase):
+    PARENT = {'phone': '9500000001', 'password': 'parentpass'}
+
+    def _signup_parent(self, client=None, phone=None):
+        client = client or self.client
+        token = get_csrf(client)
+        return client.post('/parent/signup', data={
+            'name': 'Test Parent', 'phone': phone or self.PARENT['phone'],
+            'password': self.PARENT['password'],
+            'child_name': 'Test Kid', 'child_class': '9', 'city': 'Patna',
+            'csrf_token': token,
+        }, follow_redirects=True)
+
+    def _make_discoverable(self, tutor_id):
+        with app.app_context():
+            t = db.session.get(Tutor, tutor_id)
+            t.discoverable = True
+            t.city = 'Patna'
+            db.session.commit()
+
+    def test_find_page_public(self):
+        r = self.client.get('/find')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'Find your perfect teacher', r.data)
+
+    def test_only_discoverable_tutors_listed(self):
+        r = self.client.get('/find')
+        self.assertNotIn(b'Tutor 1', r.data)  # not opted in
+        self._make_discoverable(self.ids['tutor1'])
+        r = self.client.get('/find')
+        self.assertIn(b'Tutor 1', r.data)
+        self.assertNotIn(b'Tutor 2', r.data)  # still not opted in
+
+    def test_tutor_phone_not_exposed_in_search(self):
+        self._make_discoverable(self.ids['tutor1'])
+        r = self.client.get('/find')
+        self.assertNotIn(TUTOR1['phone'].encode(), r.data)
+
+    def test_search_filters(self):
+        self._make_discoverable(self.ids['tutor1'])
+        r = self.client.get('/find?subject=Mathematics')
+        self.assertIn(b'Tutor 1', r.data)
+        r = self.client.get('/find?subject=Chemistry')
+        self.assertNotIn(b'Tutor 1', r.data)
+        r = self.client.get('/find?city=Delhi')
+        self.assertNotIn(b'Tutor 1', r.data)
+
+    def test_parent_signup_and_login(self):
+        r = self._signup_parent()
+        self.assertIn(b'Welcome, Test', r.data)
+        self.client.get('/parent/logout')
+        token = get_csrf(self.client)
+        r = self.client.post('/parent/login', data={
+            'phone': self.PARENT['phone'], 'password': self.PARENT['password'],
+            'csrf_token': token,
+        }, follow_redirects=True)
+        self.assertIn(b'My Demo Requests', r.data)
+
+    def test_parent_login_wrong_password(self):
+        self._signup_parent(phone='9500000002')
+        self.client.get('/parent/logout')
+        token = get_csrf(self.client)
+        r = self.client.post('/parent/login', data={
+            'phone': '9500000002', 'password': 'wrong', 'csrf_token': token,
+        }, follow_redirects=True)
+        self.assertIn(b'Invalid phone number or password', r.data)
+
+    def test_parent_home_requires_login(self):
+        r = self.client.get('/parent/home')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/parent/login', r.headers['Location'])
+
+    def test_next_param_rejects_offsite_urls(self):
+        self._signup_parent(phone='9500000003')
+        self.client.get('/parent/logout')
+        token = get_csrf(self.client)
+        r = self.client.post('/parent/login?next=https://evil.example', data={
+            'phone': '9500000003', 'password': self.PARENT['password'],
+            'csrf_token': token,
+        })
+        self.assertNotIn('evil.example', r.headers.get('Location', ''))
+
+    def test_request_demo_requires_account(self):
+        self._make_discoverable(self.ids['tutor1'])
+        token = get_csrf(self.client)
+        r = self.client.post(f"/find/request/{self.ids['tutor1']}",
+                             data={'csrf_token': token})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/parent/signup', r.headers['Location'])
+
+    def test_request_demo_flow(self):
+        self._make_discoverable(self.ids['tutor1'])
+        self._signup_parent(phone='9500000004')
+        token = get_csrf(self.client)
+        r = self.client.post(f"/find/request/{self.ids['tutor1']}", data={
+            'subject': 'Mathematics', 'csrf_token': token,
+        }, follow_redirects=True)
+        self.assertIn(b'Demo request sent', r.data)
+        with app.app_context():
+            req = DemoRequest.query.filter_by(phone='9500000004').first()
+            self.assertIsNotNone(req)
+            self.assertEqual(req.tutor_id, self.ids['tutor1'])
+            self.assertIsNotNone(req.parent_id)
+        # Parent home shows the request and reveals tutor contact
+        r = self.client.get('/parent/home')
+        self.assertIn(b'Tutor 1', r.data)
+        self.assertIn(b'Chat on WhatsApp', r.data)
+        # Duplicate request to the same tutor is blocked
+        r = self.client.post(f"/find/request/{self.ids['tutor1']}", data={
+            'csrf_token': token,
+        }, follow_redirects=True)
+        self.assertIn(b'already have a request', r.data)
+
+    def test_cannot_request_undiscoverable_tutor(self):
+        self._signup_parent(phone='9500000005')
+        token = get_csrf(self.client)
+        r = self.client.post(f"/find/request/{self.ids['tutor2']}",
+                             data={'csrf_token': token})
+        self.assertEqual(r.status_code, 404)
+
+    def test_tutor_sees_marketplace_request(self):
+        self._make_discoverable(self.ids['tutor1'])
+        self._signup_parent(phone='9500000006')
+        token = get_csrf(self.client)
+        self.client.post(f"/find/request/{self.ids['tutor1']}",
+                         data={'csrf_token': token})
+        tutor_client = app.test_client()
+        login(tutor_client, TUTOR1)
+        r = tutor_client.get('/bookings')
+        self.assertIn(b'Test Kid', r.data)
+        self.assertIn(b'Search', r.data)  # marketplace badge
+
+    def test_parents_see_only_their_requests(self):
+        self._make_discoverable(self.ids['tutor1'])
+        self._signup_parent(phone='9500000007')
+        token = get_csrf(self.client)
+        self.client.post(f"/find/request/{self.ids['tutor1']}",
+                         data={'csrf_token': token})
+        other = app.test_client()
+        tok2 = get_csrf(other)
+        other.post('/parent/signup', data={
+            'name': 'Other Parent', 'phone': '9500000008',
+            'password': 'otherpass1', 'csrf_token': tok2,
+        })
+        r = other.get('/parent/home')
+        self.assertNotIn(b'Test Kid', r.data)
 
 
 if __name__ == '__main__':

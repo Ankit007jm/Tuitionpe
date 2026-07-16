@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}My Requests{% endblock %}
+
+{% block content %}
+{% include "components/parent_nav.html" %}
+
+<div class="max-w-3xl mx-auto px-4 pb-20 relative z-10">
+    <div class="pt-8 pb-6">
+        <p class="section-label">Hi {{ parent.name.split()[0] }}</p>
+        <h1 class="page-title mt-1">My Demo Requests</h1>
+    </div>
+
+    {% if requests %}
+    <div class="space-y-3">
+        {% for r in requests %}
+        {% set t = tutors[r.tutor_id] %}
+        <div class="card-dark rounded-2xl p-5" style="animation: slideUp 0.4s ease both; animation-delay: {{ loop.index0 * 0.06 }}s;">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-xl gradient-accent avatar font-bold flex items-center justify-center">
+                    {% if t and t.profile_image %}
+                    <img src="{{ t.profile_image | img_url }}" alt="">
+                    {% else %}
+                    {{ (t.name if t else '?')[0]|upper }}
+                    {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-bold truncate">{{ t.name if t else 'Teacher' }}</div>
+                    <div class="text-gray-500 text-xs">
+                        {{ r.subject or 'Any subject' }}{% if r.class_grade %} &bull; Class {{ r.class_grade }}{% endif %}
+                        &bull; requested {{ r.created_at.strftime('%d %b') }}
+                    </div>
+                </div>
+                {% if r.status == 'new' %}
+                <span class="badge badge-pending"><i class="fas fa-clock"></i> Waiting</span>
+                {% elif r.status == 'contacted' %}
+                <span class="badge badge-paid"><i class="fas fa-phone"></i> In touch</span>
+                {% else %}
+                <span class="badge" style="background:var(--bg-subtle);color:var(--text-muted);">Closed</span>
+                {% endif %}
+            </div>
+            {% if t %}
+            <div class="flex gap-2 pt-3 border-t border-white/5">
+                <a href="https://wa.me/91{{ t.phone }}?text={{ ('Namaste %s! I requested a demo class on TuitionPe for %s (%s). When can we talk?' | format(t.name.split()[0], r.student_name, r.subject or 'any subject')) | urlencode }}"
+                   target="_blank" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-center"
+                   style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
+                    <i class="fab fa-whatsapp mr-1"></i> Chat on WhatsApp
+                </a>
+                <a href="tel:+91{{ t.phone }}" class="btn-outline py-2.5 px-4 rounded-xl text-sm">
+                    <i class="fas fa-phone"></i>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-dark rounded-2xl p-10 text-center" style="animation: slideUp 0.4s ease both;">
+        <div class="w-14 h-14 mx-auto rounded-2xl icon-chip gradient-cyan mb-4"><i class="fas fa-search text-xl"></i></div>
+        <p class="text-gray-400 font-medium mb-1">No demo requests yet</p>
+        <p class="text-gray-600 text-sm mb-5">Find a teacher and book your first free demo class</p>
+        <a href="{{ url_for('parents.find_teachers') }}" class="btn-primary px-6 py-3 rounded-xl text-sm">
+            <i class="fas fa-search mr-1"></i> Find Teachers
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

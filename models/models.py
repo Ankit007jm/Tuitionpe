@@ -23,6 +23,9 @@ class Tutor(UserMixin, db.Model):
     ifsc_code = db.Column(db.String(20))
     pay_token = db.Column(db.String(32))                       # Random token for public payment page URLs
     booking_token = db.Column(db.String(32))                   # Random token for public demo-booking page URL
+    discoverable = db.Column(db.Boolean, default=False)        # Opt-in: listed in parent-facing teacher search
+    city = db.Column(db.String(100))                           # For discovery filtering
+    teaching_mode = db.Column(db.String(20), default='both')   # online / offline / both
     daily_reminder = db.Column(db.Boolean, default=True)      # Enable daily email reminder
     reminder_hour = db.Column(db.Integer, default=7)           # Morning reminder hour (0-23)
     reminder_minute = db.Column(db.Integer, default=0)         # Morning reminder minute (0-59)
@@ -100,11 +103,27 @@ class Attendance(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Parent(db.Model):
+    """Parent/student account for the teacher-discovery marketplace."""
+    __tablename__ = 'parents'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(15), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    child_name = db.Column(db.String(100))
+    child_class = db.Column(db.String(20))
+    city = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    demo_requests = db.relationship('DemoRequest', backref='parent', lazy=True)
+
+
 class DemoRequest(db.Model):
     """Demo class requests submitted by parents via the tutor's public booking link."""
     __tablename__ = 'demo_requests'
     id = db.Column(db.Integer, primary_key=True)
     tutor_id = db.Column(db.Integer, db.ForeignKey('tutors.id', ondelete='CASCADE'), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('parents.id', ondelete='SET NULL'), nullable=True)
     student_name = db.Column(db.String(100), nullable=False)
     parent_name = db.Column(db.String(100))
     phone = db.Column(db.String(15), nullable=False)

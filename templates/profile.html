@@ -121,6 +121,43 @@
         </div>
     </div>
 
+    <!-- Teacher Discovery Section -->
+    <div class="card-dark rounded-2xl p-5 mb-4 {{ '' if current_user.discoverable else '' }}" style="border-left: 3px solid var(--accent);">
+        <form method="POST" action="{{ url_for('profile.update_profile') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="section" value="discovery">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="font-semibold text-sm flex items-center gap-2">
+                    <i class="fas fa-bullhorn text-emerald-500"></i> Get Discovered by Parents
+                </h3>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="discoverable" value="1" {{ 'checked' if current_user.discoverable }}
+                           onchange="this.form.submit()">
+                    <span class="text-xs font-semibold {{ 'text-emerald-500' if current_user.discoverable else 'text-gray-500' }}">
+                        {{ 'Listed' if current_user.discoverable else 'Not listed' }}
+                    </span>
+                </label>
+            </div>
+            <p class="text-gray-500 text-xs mb-4">List your profile in <a href="{{ url_for('parents.find_teachers') }}" target="_blank" class="text-accent hover:underline">teacher search</a> so parents nearby can find you and book free demo classes. Your phone number is shared only after a parent sends you a request.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1.5">Your City</label>
+                    <input type="text" name="city" value="{{ current_user.city or '' }}" maxlength="100" placeholder="e.g. Patna"
+                           class="input-dark rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1.5">Teaching Mode</label>
+                    <select name="teaching_mode" class="input-dark rounded-xl text-sm">
+                        <option value="both" {{ 'selected' if current_user.teaching_mode == 'both' }}>Online & In person</option>
+                        <option value="online" {{ 'selected' if current_user.teaching_mode == 'online' }}>Online only</option>
+                        <option value="offline" {{ 'selected' if current_user.teaching_mode == 'offline' }}>In person only</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-outline px-4 py-2 rounded-xl text-xs mt-3">Save discovery settings</button>
+        </form>
+    </div>
+
     <!-- Teaching Info Section -->
     <div class="card-dark rounded-2xl p-5 mb-4">
         <div class="flex items-center justify-between mb-4">

@@ -1,1 +1,1 @@
-from .models import db, Tutor, Student, Schedule, Payment, Attendance, DemoRequest
+from .models import db, Tutor, Student, Schedule, Payment, Attendance, DemoRequest, Parent
