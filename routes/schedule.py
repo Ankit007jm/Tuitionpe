@@ -55,23 +55,48 @@ def schedule():
 
     selected_info = next((d for d in week_days if d['day_name'] == selected_day), week_days[0])
 
+    # Group batch classes (same batch name + start time) into one visual card
+    groups = []
+    batch_index = {}
+    for item in schedule_data:
+        sched = item['schedule']
+        if sched.batch_name:
+            key = (sched.batch_name, sched.start_time)
+            if key not in batch_index:
+                batch_index[key] = {
+                    'is_batch': True,
+                    'batch_name': sched.batch_name,
+                    'start_time': sched.start_time,
+                    'end_time': sched.end_time,
+                    'class_type': sched.class_type,
+                    'entries': [],
+                }
+                groups.append(batch_index[key])
+            batch_index[key]['entries'].append(item)
+        else:
+            groups.append({'is_batch': False, 'start_time': sched.start_time, 'entries': [item]})
+
     return render_template('schedule.html',
-        week_days=week_days, schedule_data=schedule_data,
+        week_days=week_days, schedule_data=schedule_data, groups=groups,
         selected_day=selected_day, selected_info=selected_info,
         students=students)
 
 @schedule_bp.route('/schedule/add', methods=['POST'])
 @login_required
 def add_schedule():
-    student_id = request.form.get('student_id')
+    # Supports both a single student and a batch (multiple students, one slot)
+    student_ids = request.form.getlist('student_ids')
+    if not student_ids and request.form.get('student_id'):
+        student_ids = [request.form.get('student_id')]
     day_of_week = request.form.get('day_of_week')
     start_time = request.form.get('start_time')
     end_time = request.form.get('end_time', '')
     class_type = request.form.get('class_type', 'offline')
     location = request.form.get('location', '')
+    batch_name = request.form.get('batch_name', '').strip()[:60]
 
-    if not student_id or not day_of_week or not start_time:
-        flash('Please fill in all required fields.', 'error')
+    if not student_ids or not day_of_week or not start_time:
+        flash('Please select at least one student and a time.', 'error')
         return redirect(url_for('schedule.schedule'))
 
     # Validate time format
@@ -80,18 +105,41 @@ def add_schedule():
         flash('Invalid start time format.', 'error')
         return redirect(url_for('schedule.schedule'))
 
-    sched = Schedule(
-        tutor_id=current_user.id,
-        student_id=int(student_id),
-        day_of_week=day_of_week,
-        start_time=start_time,
-        end_time=end_time,
-        class_type=class_type,
-        location=location,
-    )
-    db.session.add(sched)
+    # Multi-student slots always get a batch label so they group visually
+    if not batch_name:
+        batch_name = 'Group class' if len(student_ids) > 1 else None
+
+    # Only the tutor's own active students can be scheduled
+    valid_ids = {s.id for s in Student.query.filter_by(tutor_id=current_user.id, status='active').all()}
+    added = 0
+    for sid in student_ids:
+        try:
+            sid = int(sid)
+        except (TypeError, ValueError):
+            continue
+        if sid not in valid_ids:
+            continue
+        db.session.add(Schedule(
+            tutor_id=current_user.id,
+            student_id=sid,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            end_time=end_time,
+            class_type=class_type,
+            location=location,
+            batch_name=batch_name,
+        ))
+        added += 1
+
+    if not added:
+        flash('No valid students selected.', 'error')
+        return redirect(url_for('schedule.schedule', day=day_of_week))
+
     db.session.commit()
-    flash('Class scheduled successfully!', 'success')
+    if added > 1:
+        flash(f'Batch scheduled with {added} students!', 'success')
+    else:
+        flash('Class scheduled successfully!', 'success')
     return redirect(url_for('schedule.schedule', day=day_of_week))
 
 @schedule_bp.route('/schedule/<int:id>/delete', methods=['POST'])

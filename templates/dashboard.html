@@ -16,6 +16,21 @@
         </div>
     </div>
 
+    <!-- New demo requests banner -->
+    {% if new_demo_requests %}
+    <a href="{{ url_for('booking.bookings') }}"
+       class="card-dark rounded-2xl p-3.5 flex items-center gap-3 mb-5 block" style="border-left: 3px solid var(--warning); animation: slideUp 0.4s ease both;">
+        <div class="w-9 h-9 rounded-xl icon-chip gradient-orange flex-shrink-0">
+            <i class="fas fa-bullhorn text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold">{{ new_demo_requests }} new demo request{{ 's' if new_demo_requests > 1 else '' }}</p>
+            <p class="text-gray-500 text-xs">Parents are waiting to hear from you</p>
+        </div>
+        <i class="fas fa-chevron-right text-gray-600 text-xs flex-shrink-0"></i>
+    </a>
+    {% endif %}
+
     <!-- Stats Grid — clickable cards -->
     <div class="grid grid-cols-2 gap-3 mb-6 stats-grid-desktop">
         <!-- Active Students Card -->

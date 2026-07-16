@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify
 from flask_login import login_required, current_user
-from models import db, Student, Schedule, Payment, Attendance
+from models import db, Student, Schedule, Payment, Attendance, DemoRequest
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
 import random
@@ -244,6 +244,10 @@ def dashboard():
     # Motivational quotes for each card
     quotes = {k: random.choice(v) for k, v in MOTIVATIONAL_QUOTES.items()}
 
+    # New demo-class requests (from the public booking link)
+    new_demo_requests = DemoRequest.query.filter_by(
+        tutor_id=current_user.id, status='new').count()
+
     return render_template('dashboard.html',
         stats=stats, chart_data=chart_data,
         today_classes=today_classes, progress=progress,
@@ -251,6 +255,7 @@ def dashboard():
         pending_fees_detail=pending_fees_detail,
         collected_fees_detail=collected_fees_detail,
         recent_payments=recent_payments,
+        new_demo_requests=new_demo_requests,
         quotes=quotes)
 
 @dashboard_bp.route('/api/stats')

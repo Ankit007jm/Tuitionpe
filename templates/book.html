@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Book a Demo Class with {{ tutor.name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-10 grid-bg relative z-10">
+    <div class="w-full auth-container mx-auto">
+        <!-- Tutor header -->
+        <div class="text-center mb-7">
+            <div class="w-16 h-16 mx-auto gradient-accent rounded-2xl flex items-center justify-center text-xl font-bold avatar mb-3">
+                {% if tutor.profile_image %}
+                <img src="{{ tutor.profile_image | img_url }}" alt="{{ tutor.name }}">
+                {% else %}
+                {{ tutor.name[0]|upper }}
+                {% endif %}
+            </div>
+            <h1 class="text-2xl font-extrabold tracking-tight">{{ tutor.name }}</h1>
+            <p class="text-gray-500 text-sm mt-1">
+                {% if subjects %}{{ subjects|join(' • ') }}{% else %}Tutor{% endif %}
+                {% if tutor.experience_years %} &bull; {{ tutor.experience_years }}+ yrs experience{% endif %}
+            </p>
+            {% if tutor.qualification %}
+            <p class="text-gray-600 text-xs mt-1">{{ tutor.qualification }}</p>
+            {% endif %}
+        </div>
+
+        {% if sent %}
+        <!-- Success state -->
+        <div class="card-dark rounded-3xl p-8 text-center">
+            <div class="w-14 h-14 mx-auto rounded-2xl icon-chip gradient-green mb-4">
+                <i class="fas fa-check text-xl"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Request sent!</h2>
+            <p class="text-gray-500 text-sm">{{ tutor.name }} will contact you shortly to confirm your free demo class.</p>
+        </div>
+        {% else %}
+        <!-- Booking form -->
+        <div class="card-dark rounded-3xl p-7">
+            <h2 class="text-lg font-bold mb-1">Book a free demo class</h2>
+            <p class="text-gray-500 text-sm mb-6">Fill in your details and {{ tutor.name.split()[0] }} will get in touch.</p>
+
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <!-- Honeypot (hidden from humans) -->
+                <input type="text" name="website" tabindex="-1" autocomplete="off"
+                       style="position:absolute;left:-9999px;height:0;width:0;opacity:0;" aria-hidden="true">
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Student Name *</label>
+                        <input type="text" name="student_name" required maxlength="100" placeholder="Your child's name" class="input-dark rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Parent Name</label>
+                        <input type="text" name="parent_name" maxlength="100" placeholder="Your name" class="input-dark rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">WhatsApp Number *</label>
+                        <div class="flex phone-group">
+                            <span class="phone-prefix">+91</span>
+                            <input type="tel" name="phone" placeholder="10-digit number" class="phone-input" maxlength="10" pattern="[0-9]{10}" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Class</label>
+                            <input type="text" name="class_grade" maxlength="20" placeholder="e.g. 10" class="input-dark rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Subject</label>
+                            {% if subjects %}
+                            <select name="subject" class="input-dark rounded-xl">
+                                {% for s in subjects %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                            </select>
+                            {% else %}
+                            <input type="text" name="subject" maxlength="100" placeholder="Subject" class="input-dark rounded-xl">
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Preferred Day</label>
+                            <select name="preferred_day" class="input-dark rounded-xl">
+                                <option value="">Any day</option>
+                                {% for d in days %}<option value="{{ d }}">{{ d|capitalize }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Preferred Time</label>
+                            <input type="text" name="preferred_time" maxlength="20" placeholder="e.g. 5 PM" class="input-dark rounded-xl">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Anything else?</label>
+                        <textarea name="note" rows="2" maxlength="500" placeholder="Goals, exam prep, current level..." class="input-dark rounded-xl resize-none"></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full btn-primary py-4 rounded-xl font-semibold mt-6">
+                    <i class="fas fa-paper-plane"></i> Request Demo Class
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        <p class="text-center text-gray-600 text-xs mt-6">
+            Powered by <span class="font-bold text-gradient-accent">TuitionPe</span> — Smart Tuition Management
+        </p>
+    </div>
+</div>
+{% endblock %}

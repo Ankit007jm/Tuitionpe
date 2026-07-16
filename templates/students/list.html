@@ -114,6 +114,9 @@
                     <a href="{{ url_for('fees.payment_history', student_id=s.id) }}" class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-accent/30 transition-all" title="Payment History">
                         <i class="fas fa-history text-xs text-gray-400"></i>
                     </a>
+                    <a href="{{ url_for('students.progress_report', id=s.id) }}" data-no-fade class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-accent/30 transition-all" title="Download Progress Report (PDF)">
+                        <i class="fas fa-chart-line text-xs text-gray-400"></i>
+                    </a>
                     <a href="{{ url_for('fees.remind', student_id=s.id) }}" target="_blank" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:var(--success-bg);">
                         <i class="fab fa-whatsapp text-sm" style="color:var(--success);"></i>
                     </a>
