@@ -134,3 +134,16 @@ class DemoRequest(db.Model):
     note = db.Column(db.Text)
     status = db.Column(db.String(20), default='new')  # new / contacted / closed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Review(db.Model):
+    """Parent rating for a tutor after a demo request was acted on."""
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    tutor_id = db.Column(db.Integer, db.ForeignKey('tutors.id', ondelete='CASCADE'), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('parents.id', ondelete='CASCADE'), nullable=False)
+    demo_request_id = db.Column(db.Integer, db.ForeignKey('demo_requests.id', ondelete='CASCADE'),
+                                nullable=False, unique=True)
+    rating = db.Column(db.Integer, nullable=False)  # 1-5
+    comment = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

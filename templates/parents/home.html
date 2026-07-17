@@ -49,6 +49,45 @@
                     <i class="fas fa-phone"></i>
                 </a>
             </div>
+
+            <!-- Rating (available once the tutor has been in touch) -->
+            {% if r.status != 'new' %}
+            {% set existing = my_reviews.get(r.id) %}
+            <div class="pt-3 mt-3 border-t border-white/5">
+                {% if existing %}
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="text-gray-500 font-semibold">Your rating:</span>
+                    <span style="color:var(--warning);">
+                        {% for i in range(existing.rating) %}<i class="fas fa-star"></i>{% endfor %}
+                    </span>
+                    {% if existing.comment %}<span class="text-gray-500 truncate">"{{ existing.comment }}"</span>{% endif %}
+                    <button type="button" onclick="this.closest('div').nextElementSibling.style.display='block'; this.closest('div').style.display='none';"
+                            class="text-accent font-semibold ml-auto hover:underline" style="background:none;border:none;cursor:pointer;">Edit</button>
+                </div>
+                <form method="POST" action="{{ url_for('parents.submit_review', request_id=r.id) }}" style="display:none;" class="rating-form">
+                {% else %}
+                <form method="POST" action="{{ url_for('parents.submit_review', request_id=r.id) }}" class="rating-form">
+                {% endif %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <p class="text-xs font-semibold text-gray-500 mb-2">How was {{ t.name.split()[0] }}? Help other parents:</p>
+                    <div class="flex items-center gap-2">
+                        <div class="star-picker flex gap-1" data-request="{{ r.id }}">
+                            {% for i in range(1, 6) %}
+                            <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} star{{ 's' if i > 1 }}"
+                                    style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-faint);padding:2px;">
+                                <i class="fas fa-star"></i>
+                            </button>
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" name="rating" value="{{ existing.rating if existing else '' }}" required>
+                        <input type="text" name="comment" maxlength="300" placeholder="Optional comment"
+                               value="{{ existing.comment if existing else '' }}"
+                               class="input-dark rounded-lg text-xs flex-1" style="padding:7px 10px;">
+                        <button type="submit" class="btn-primary px-3 py-2 rounded-lg text-xs">Rate</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
             {% endif %}
         </div>
         {% endfor %}
@@ -64,4 +103,39 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Star picker: click a star to set the hidden rating input
+document.querySelectorAll('.rating-form').forEach(function(form) {
+    var stars = form.querySelectorAll('.star-btn');
+    var input = form.querySelector('input[name="rating"]');
+
+    function paint(value) {
+        stars.forEach(function(btn) {
+            btn.style.color = parseInt(btn.dataset.value) <= value ? 'var(--warning)' : 'var(--text-faint)';
+        });
+    }
+
+    stars.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            input.value = btn.dataset.value;
+            paint(parseInt(btn.dataset.value));
+        });
+        btn.addEventListener('mouseenter', function() { paint(parseInt(btn.dataset.value)); });
+    });
+    form.addEventListener('mouseleave', function() { paint(parseInt(input.value) || 0); });
+
+    form.addEventListener('submit', function(e) {
+        if (!input.value) {
+            e.preventDefault();
+            showToast('Pick a star rating first', 'error');
+        }
+    });
+
+    // Pre-paint existing rating when editing
+    if (input.value) paint(parseInt(input.value));
+});
+</script>
 {% endblock %}

@@ -5,12 +5,67 @@ Parents open the tutor's shareable link (no login) and request a demo
 class. The tutor reviews requests under /bookings.
 """
 import secrets
+import threading
 import time
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
 from flask_login import login_required, current_user
 from models import db, Tutor, DemoRequest
 
 booking_bp = Blueprint('booking', __name__)
+
+
+def notify_tutor_new_request(tutor, req, source='booking link'):
+    """Email the tutor the moment a demo request arrives (background thread).
+
+    Fails silently — the request is already saved; email is best-effort.
+    """
+    if not tutor or not tutor.email:
+        return
+    app_obj = current_app._get_current_object()
+    with app_obj.app_context():
+        bookings_url = url_for('booking.bookings', _external=True)
+    details = [
+        ('Student', req.student_name),
+        ('Class', req.class_grade or '-'),
+        ('Subject', req.subject or 'Any'),
+        ('Parent', req.parent_name or '-'),
+        ('Phone', f'+91 {req.phone}'),
+    ]
+    if req.preferred_day or req.preferred_time:
+        details.append(('Preferred', f"{(req.preferred_day or '').capitalize()} {req.preferred_time or ''}".strip()))
+    if req.note:
+        details.append(('Note', req.note))
+    rows = ''.join(
+        f'<tr><td style="padding:6px 12px 6px 0;color:#7d8c88;font-size:13px;">{label}</td>'
+        f'<td style="padding:6px 0;color:#10201c;font-size:13px;font-weight:600;">{value}</td></tr>'
+        for label, value in details
+    )
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+      <div style="background:#0d9488;border-radius:12px 12px 0 0;padding:18px 22px;">
+        <h2 style="color:#fff;margin:0;font-size:18px;">New demo class request!</h2>
+        <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;">via your {source}</p>
+      </div>
+      <div style="border:1px solid #e3eae8;border-top:0;border-radius:0 0 12px 12px;padding:20px 22px;">
+        <table style="border-collapse:collapse;">{rows}</table>
+        <a href="https://wa.me/91{req.phone}" style="display:inline-block;margin-top:16px;background:#0d9488;color:#fff;
+           text-decoration:none;padding:11px 20px;border-radius:10px;font-size:14px;font-weight:bold;">
+           Reply on WhatsApp</a>
+        <a href="{bookings_url}" style="display:inline-block;margin-top:16px;margin-left:8px;color:#0d9488;
+           text-decoration:none;padding:11px 8px;font-size:13px;">View all requests</a>
+        <p style="color:#a3b0ac;font-size:11px;margin-top:18px;">Respond fast — parents usually pick the first teacher who replies.</p>
+      </div>
+    </div>"""
+
+    def _send(app, to_email, subject, body):
+        from reminder import send_email
+        send_email(app, to_email, subject, body)
+
+    threading.Thread(
+        target=_send,
+        args=(app_obj, tutor.email, f'New demo request: {req.student_name} ({req.subject or "Any subject"})', html),
+        daemon=True,
+    ).start()
 
 # Simple per-IP rate limit for the public form: max 5 submissions / 10 min
 _submissions = {}
@@ -77,7 +132,7 @@ def book_demo(tutor_id, token):
         if preferred_day and preferred_day not in DAYS:
             preferred_day = ''
 
-        db.session.add(DemoRequest(
+        req = DemoRequest(
             tutor_id=tutor.id,
             student_name=student_name,
             parent_name=parent_name,
@@ -87,9 +142,11 @@ def book_demo(tutor_id, token):
             preferred_day=preferred_day,
             preferred_time=preferred_time,
             note=note,
-        ))
+        )
+        db.session.add(req)
         db.session.commit()
         _record_submission(client_ip)
+        notify_tutor_new_request(tutor, req, source='booking link')
         return redirect(url_for('booking.book_demo', tutor_id=tutor_id, token=token, sent='1'))
 
     return render_template('book.html',

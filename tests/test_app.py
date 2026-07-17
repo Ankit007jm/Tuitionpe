@@ -24,7 +24,7 @@ os.environ.pop('GOOGLE_CLIENT_SECRET', None)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app  # noqa: E402
-from models import db, Tutor, Student, Schedule, Payment, Attendance, DemoRequest, Parent  # noqa: E402
+from models import db, Tutor, Student, Schedule, Payment, Attendance, DemoRequest, Parent, Review  # noqa: E402
 from werkzeug.security import generate_password_hash  # noqa: E402
 import routes.auth as auth_mod  # noqa: E402
 import routes.booking as booking_mod  # noqa: E402
@@ -354,20 +354,28 @@ class TestStudents(BaseCase):
 # Schedule & batches
 # ─────────────────────────────────────────────────────────────
 class TestSchedule(BaseCase):
+    # Days guaranteed not to collide with the seeded "today" schedules
+    @staticmethod
+    def _other_days():
+        today = datetime.now().strftime('%A').lower()
+        days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        return [d for d in days if d != today]
+
     def setUp(self):
         super().setUp()
         login(self.client)
         self.token = get_csrf(self.client)
+        self.day_a, self.day_b, self.day_c = self._other_days()[:3]
 
     def test_single_class_add(self):
         r = self.client.post('/schedule/add', data={
             'student_ids': [str(self.ids['student1'])],
-            'day_of_week': 'friday', 'start_time': '09:00',
+            'day_of_week': self.day_a, 'start_time': '09:00',
             'csrf_token': self.token,
         }, follow_redirects=True)
         self.assertIn(b'Class scheduled successfully', r.data)
         with app.app_context():
-            rows = Schedule.query.filter_by(day_of_week='friday').all()
+            rows = Schedule.query.filter_by(day_of_week=self.day_a, start_time='09:00').all()
             self.assertEqual(len(rows), 1)
             self.assertIsNone(rows[0].batch_name)
 
@@ -380,7 +388,7 @@ class TestSchedule(BaseCase):
             extra_id = extra.id
         r = self.client.post('/schedule/add', data={
             'student_ids': [str(self.ids['student1']), str(extra_id)],
-            'day_of_week': 'saturday', 'start_time': '15:00',
+            'day_of_week': self.day_b, 'start_time': '15:00',
             'batch_name': 'Weekend Batch',
             'csrf_token': self.token,
         }, follow_redirects=True)
@@ -388,24 +396,24 @@ class TestSchedule(BaseCase):
         with app.app_context():
             rows = Schedule.query.filter_by(batch_name='Weekend Batch').all()
             self.assertEqual(len(rows), 2)
-        page = self.client.get('/schedule?day=saturday')
+        page = self.client.get(f'/schedule?day={self.day_b}')
         self.assertIn(b'Weekend Batch', page.data)
         self.assertIn(b'BATCH', page.data)
 
     def test_batch_add_rejects_foreign_students(self):
         r = self.client.post('/schedule/add', data={
             'student_ids': [str(self.ids['student2'])],  # tutor 2's student
-            'day_of_week': 'sunday', 'start_time': '10:00',
+            'day_of_week': self.day_c, 'start_time': '10:00',
             'csrf_token': self.token,
         }, follow_redirects=True)
         self.assertIn(b'No valid students selected', r.data)
         with app.app_context():
-            self.assertEqual(Schedule.query.filter_by(day_of_week='sunday').count(), 0)
+            self.assertEqual(Schedule.query.filter_by(day_of_week=self.day_c).count(), 0)
 
     def test_invalid_time_rejected(self):
         r = self.client.post('/schedule/add', data={
             'student_ids': [str(self.ids['student1'])],
-            'day_of_week': 'friday', 'start_time': 'not-a-time',
+            'day_of_week': self.day_a, 'start_time': 'not-a-time',
             'csrf_token': self.token,
         }, follow_redirects=True)
         self.assertIn(b'Invalid start time format', r.data)
@@ -713,6 +721,125 @@ class TestMarketplace(BaseCase):
         })
         r = other.get('/parent/home')
         self.assertNotIn(b'Test Kid', r.data)
+
+
+# ─────────────────────────────────────────────────────────────
+# Landing page & reviews
+# ─────────────────────────────────────────────────────────────
+class TestLandingAndReviews(BaseCase):
+    def _parent_with_request(self, phone, status='contacted'):
+        """Signup a parent and give them a demo request in the given status."""
+        token = get_csrf(self.client)
+        self.client.post('/parent/signup', data={
+            'name': 'Review Parent', 'phone': phone, 'password': 'reviewpass',
+            'child_name': 'Review Kid', 'csrf_token': token,
+        })
+        with app.app_context():
+            t = db.session.get(Tutor, self.ids['tutor1'])
+            t.discoverable = True
+            parent = Parent.query.filter_by(phone=phone).first()
+            req = DemoRequest(tutor_id=t.id, parent_id=parent.id,
+                              student_name='Review Kid', phone=phone, status=status)
+            db.session.add(req)
+            db.session.commit()
+            return req.id
+
+    def test_landing_page_anonymous(self):
+        r = self.client.get('/')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'I\'m looking for a teacher', r.data.replace(b'&#39;', b'\''))
+        self.assertIn(b'Teacher login', r.data)
+
+    def test_landing_redirects_logged_in_tutor(self):
+        login(self.client)
+        r = self.client.get('/')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/dashboard', r.headers['Location'])
+
+    def test_landing_redirects_logged_in_parent(self):
+        token = get_csrf(self.client)
+        self.client.post('/parent/signup', data={
+            'name': 'Land Parent', 'phone': '9400000001', 'password': 'landpass1',
+            'csrf_token': token,
+        })
+        r = self.client.get('/')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/find', r.headers['Location'])
+
+    def test_review_blocked_while_request_new(self):
+        rid = self._parent_with_request('9400000002', status='new')
+        token = get_csrf(self.client)
+        r = self.client.post(f'/parent/review/{rid}', data={
+            'rating': '5', 'csrf_token': token,
+        }, follow_redirects=True)
+        self.assertIn(b'once they have been in touch', r.data)
+        with app.app_context():
+            self.assertEqual(Review.query.filter_by(demo_request_id=rid).count(), 0)
+
+    def test_review_submit_and_update(self):
+        rid = self._parent_with_request('9400000003', status='contacted')
+        token = get_csrf(self.client)
+        r = self.client.post(f'/parent/review/{rid}', data={
+            'rating': '5', 'comment': 'Great teacher!', 'csrf_token': token,
+        }, follow_redirects=True)
+        self.assertIn(b'Thanks for rating', r.data)
+        with app.app_context():
+            rv = Review.query.filter_by(demo_request_id=rid).first()
+            self.assertEqual(rv.rating, 5)
+        # Update instead of duplicate
+        self.client.post(f'/parent/review/{rid}', data={
+            'rating': '4', 'csrf_token': token,
+        })
+        with app.app_context():
+            self.assertEqual(Review.query.filter_by(demo_request_id=rid).count(), 1)
+            self.assertEqual(Review.query.filter_by(demo_request_id=rid).first().rating, 4)
+
+    def test_review_rating_bounds(self):
+        rid = self._parent_with_request('9400000004', status='closed')
+        token = get_csrf(self.client)
+        for bad in ('0', '6', 'abc', ''):
+            self.client.post(f'/parent/review/{rid}', data={
+                'rating': bad, 'csrf_token': token,
+            })
+        with app.app_context():
+            self.assertEqual(Review.query.filter_by(demo_request_id=rid).count(), 0)
+
+    def test_cannot_review_others_request(self):
+        rid = self._parent_with_request('9400000005', status='contacted')
+        other = app.test_client()
+        tok = get_csrf(other)
+        other.post('/parent/signup', data={
+            'name': 'Sneaky', 'phone': '9400000006', 'password': 'sneakypass',
+            'csrf_token': tok,
+        })
+        r = other.post(f'/parent/review/{rid}', data={'rating': '1', 'csrf_token': get_csrf(other)})
+        self.assertEqual(r.status_code, 404)
+
+    def test_rating_shows_on_find_page(self):
+        rid = self._parent_with_request('9400000007', status='contacted')
+        token = get_csrf(self.client)
+        self.client.post(f'/parent/review/{rid}', data={
+            'rating': '5', 'csrf_token': token,
+        })
+        r = self.client.get('/find')
+        self.assertIn(b'fa-star', r.data)
+        self.assertIn(b'5.0', r.data)
+
+    def test_marketplace_request_with_tutor_email_does_not_crash(self):
+        """Tutor 1 has an email; the notify thread must not break the request."""
+        with app.app_context():
+            t = db.session.get(Tutor, self.ids['tutor1'])
+            t.discoverable = True
+            db.session.commit()
+        token = get_csrf(self.client)
+        self.client.post('/parent/signup', data={
+            'name': 'Notify Parent', 'phone': '9400000008', 'password': 'notifypass',
+            'csrf_token': token,
+        })
+        r = self.client.post(f"/find/request/{self.ids['tutor1']}", data={
+            'csrf_token': get_csrf(self.client),
+        }, follow_redirects=True)
+        self.assertIn(b'Demo request sent', r.data)
 
 
 if __name__ == '__main__':

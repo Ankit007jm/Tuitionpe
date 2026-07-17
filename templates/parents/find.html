@@ -69,7 +69,15 @@
                     {% endif %}
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="font-bold truncate">{{ t.name }}</div>
+                    <div class="font-bold truncate flex items-center gap-2">
+                        {{ t.name }}
+                        {% if t.id in ratings %}
+                        <span class="text-xs font-bold flex-shrink-0" style="color:var(--warning);" title="{{ ratings[t.id][1] }} review{{ 's' if ratings[t.id][1] != 1 }}">
+                            <i class="fas fa-star"></i> {{ ratings[t.id][0] }}
+                            <span class="text-gray-500 font-medium">({{ ratings[t.id][1] }})</span>
+                        </span>
+                        {% endif %}
+                    </div>
                     <div class="text-gray-500 text-xs">
                         {% if t.qualification %}{{ t.qualification }}{% endif %}
                         {% if t.experience_years %} &bull; {{ t.experience_years }}+ yrs{% endif %}

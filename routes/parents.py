@@ -15,7 +15,9 @@ from functools import wraps
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, Tutor, Parent, DemoRequest
+from sqlalchemy import func
+from models import db, Tutor, Parent, DemoRequest, Review
+from routes.booking import notify_tutor_new_request
 
 parents_bp = Blueprint('parents', __name__)
 
@@ -83,6 +85,16 @@ def find_teachers():
 
     tutors = query.order_by(Tutor.experience_years.desc()).limit(50).all()
 
+    # Aggregate ratings per tutor: {tutor_id: (avg, count)}
+    ratings = {
+        tid: (round(avg, 1), count)
+        for tid, avg, count in db.session.query(
+            Review.tutor_id, func.avg(Review.rating), func.count(Review.id)
+        ).group_by(Review.tutor_id).all()
+    }
+    # Rated tutors float above unrated ones with equal experience
+    tutors.sort(key=lambda t: (ratings.get(t.id, (0, 0))[0], t.experience_years or 0), reverse=True)
+
     parent = current_parent()
     # Which of these tutors has this parent already requested?
     requested_ids = set()
@@ -98,7 +110,7 @@ def find_teachers():
                 subjects_set.append(s)
 
     return render_template('parents/find.html',
-        tutors=tutors, parent=parent, requested_ids=requested_ids,
+        tutors=tutors, parent=parent, requested_ids=requested_ids, ratings=ratings,
         subject=subject, class_grade=class_grade, city=city, mode=mode,
         popular_subjects=subjects_set[:8])
 
@@ -124,7 +136,7 @@ def request_demo(tutor_id):
         return redirect(url_for('parents.parent_home'))
 
     subject = request.form.get('subject', '').strip()[:100]
-    db.session.add(DemoRequest(
+    req = DemoRequest(
         tutor_id=tutor.id,
         parent_id=parent.id,
         student_name=parent.child_name or parent.name,
@@ -133,9 +145,11 @@ def request_demo(tutor_id):
         class_grade=parent.child_class,
         subject=subject or (tutor.subjects or '').split(',')[0].strip(),
         note=request.form.get('note', '').strip()[:500],
-    ))
+    )
+    db.session.add(req)
     db.session.commit()
     _record(client_ip, 'demo')
+    notify_tutor_new_request(tutor, req, source='TuitionPe teacher search')
     flash(f'Demo request sent to {tutor.name}! You can chat with them right away.', 'success')
     return redirect(url_for('parents.parent_home'))
 
@@ -217,7 +231,7 @@ def parent_logout():
 
 
 # ─────────────────────────────────────────────────────────────
-# Parent dashboard
+# Parent dashboard + reviews
 # ─────────────────────────────────────────────────────────────
 @parents_bp.route('/parent/home')
 @parent_required
@@ -229,4 +243,37 @@ def parent_home(parent):
     for r in reqs:
         if r.tutor_id not in tutor_map:
             tutor_map[r.tutor_id] = db.session.get(Tutor, r.tutor_id)
-    return render_template('parents/home.html', parent=parent, requests=reqs, tutors=tutor_map)
+    my_reviews = {rv.demo_request_id: rv for rv in Review.query.filter_by(parent_id=parent.id).all()}
+    return render_template('parents/home.html', parent=parent, requests=reqs,
+                           tutors=tutor_map, my_reviews=my_reviews)
+
+
+@parents_bp.route('/parent/review/<int:request_id>', methods=['POST'])
+@parent_required
+def submit_review(parent, request_id):
+    req = DemoRequest.query.filter_by(id=request_id, parent_id=parent.id).first_or_404()
+    if req.status == 'new':
+        flash('You can rate a teacher once they have been in touch.', 'info')
+        return redirect(url_for('parents.parent_home'))
+
+    try:
+        rating = int(request.form.get('rating', 0))
+    except (TypeError, ValueError):
+        rating = 0
+    if rating < 1 or rating > 5:
+        flash('Please pick a rating from 1 to 5 stars.', 'error')
+        return redirect(url_for('parents.parent_home'))
+
+    comment = request.form.get('comment', '').strip()[:300]
+    review = Review.query.filter_by(demo_request_id=req.id).first()
+    if review:
+        review.rating = rating
+        review.comment = comment
+    else:
+        db.session.add(Review(
+            tutor_id=req.tutor_id, parent_id=parent.id,
+            demo_request_id=req.id, rating=rating, comment=comment,
+        ))
+    db.session.commit()
+    flash('Thanks for rating! Your review helps other parents choose.', 'success')
+    return redirect(url_for('parents.parent_home'))

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 # Load .env file so MAIL_USERNAME, MAIL_PASSWORD etc. are available
 load_dotenv()
 
-from flask import Flask, redirect, url_for, session, request, abort
+from flask import Flask, redirect, url_for, session, request, abort, render_template
 from flask_login import LoginManager
 from config import Config
 from models import db, Tutor
@@ -114,7 +114,9 @@ def index():
     from flask_login import current_user
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.dashboard'))
-    return redirect(url_for('auth.login'))
+    if session.get('parent_id'):
+        return redirect(url_for('parents.find_teachers'))
+    return render_template('landing.html')
 
 # Create tables + migrate missing columns
 with app.app_context():
