@@ -206,7 +206,8 @@ class TestAuth(BaseCase):
 
     def test_otp_never_stored_in_session_cookie(self):
         """The session cookie is client-readable; the OTP must not be in it."""
-        auth_mod._store_otp(self.ids['tutor1'], '123456')
+        with app.app_context():
+            auth_mod._store_otp(self.ids['tutor1'], '123456')
         with self.client.session_transaction() as s:
             s['reset_tutor_id'] = self.ids['tutor1']
             s['reset_phone'] = TUTOR1['phone']
@@ -214,7 +215,8 @@ class TestAuth(BaseCase):
             self.assertNotIn('reset_otp', s)
 
     def test_otp_attempt_limit(self):
-        auth_mod._store_otp(self.ids['tutor1'], '654321')
+        with app.app_context():
+            auth_mod._store_otp(self.ids['tutor1'], '654321')
         with self.client.session_transaction() as s:
             s['reset_tutor_id'] = self.ids['tutor1']
         token = get_csrf(self.client)
@@ -224,10 +226,13 @@ class TestAuth(BaseCase):
                              follow_redirects=True)
         self.assertIn(b'Too many incorrect attempts', r.data)
         # OTP record is gone — even the right code no longer works
-        self.assertNotIn(self.ids['tutor1'], auth_mod._pending_otps)
+        from models import PasswordReset
+        with app.app_context():
+            self.assertIsNone(db.session.get(PasswordReset, self.ids['tutor1']))
 
     def test_otp_correct_flow(self):
-        auth_mod._store_otp(self.ids['tutor1'], '111222')
+        with app.app_context():
+            auth_mod._store_otp(self.ids['tutor1'], '111222')
         with self.client.session_transaction() as s:
             s['reset_tutor_id'] = self.ids['tutor1']
         token = get_csrf(self.client)

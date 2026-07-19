@@ -61,11 +61,9 @@ def notify_tutor_new_request(tutor, req, source='booking link'):
         from reminder import send_email
         send_email(app, to_email, subject, body)
 
-    threading.Thread(
-        target=_send,
-        args=(app_obj, tutor.email, f'New demo request: {req.student_name} ({req.subject or "Any subject"})', html),
-        daemon=True,
-    ).start()
+    from utils import run_async
+    run_async(_send, app_obj, tutor.email,
+              f'New demo request: {req.student_name} ({req.subject or "Any subject"})', html)
 
 # Simple per-IP rate limit for the public form: max 5 submissions / 10 min
 _submissions = {}

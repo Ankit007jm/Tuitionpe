@@ -147,3 +147,12 @@ class Review(db.Model):
     rating = db.Column(db.Integer, nullable=False)  # 1-5
     comment = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PasswordReset(db.Model):
+    """Server-side OTP store for password resets (survives serverless invocations)."""
+    __tablename__ = 'password_resets'
+    tutor_id = db.Column(db.Integer, db.ForeignKey('tutors.id', ondelete='CASCADE'), primary_key=True)
+    otp_hash = db.Column(db.String(64), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    attempts = db.Column(db.Integer, default=0, nullable=False)

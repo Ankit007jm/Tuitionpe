@@ -51,36 +51,48 @@ def _record_attempt(ip):
 # ── Server-side pending OTPs ─────────────────────────────────
 # The Flask session cookie is signed but CLIENT-READABLE, so the OTP must
 # never be stored in it (whoever triggers the reset holds that cookie).
-# Keep only a hash server-side, with expiry and an attempt cap.
+# Hashes live in the database with expiry and an attempt cap — DB-backed so
+# the flow also works on serverless hosts where process memory doesn't persist.
 import hashlib
+from models import PasswordReset
 
-_pending_otps = {}  # tutor_id -> {'otp_hash', 'expires', 'attempts'}
 MAX_OTP_ATTEMPTS = 5
 
 
 def _store_otp(tutor_id, otp):
-    _pending_otps[tutor_id] = {
-        'otp_hash': hashlib.sha256(otp.encode()).hexdigest(),
-        'expires': datetime.utcnow() + timedelta(minutes=10),
-        'attempts': 0,
-    }
+    rec = db.session.get(PasswordReset, tutor_id)
+    if not rec:
+        rec = PasswordReset(tutor_id=tutor_id, otp_hash='', expires_at=datetime.utcnow())
+        db.session.add(rec)
+    rec.otp_hash = hashlib.sha256(otp.encode()).hexdigest()
+    rec.expires_at = datetime.utcnow() + timedelta(minutes=10)
+    rec.attempts = 0
+    db.session.commit()
+
+
+def _clear_otp(tutor_id):
+    rec = db.session.get(PasswordReset, tutor_id)
+    if rec:
+        db.session.delete(rec)
+        db.session.commit()
 
 
 def _check_otp(tutor_id, entered):
     """Returns 'ok' | 'bad' | 'expired' | 'locked' | 'missing'."""
-    rec = _pending_otps.get(tutor_id)
+    rec = db.session.get(PasswordReset, tutor_id)
     if not rec:
         return 'missing'
-    if datetime.utcnow() > rec['expires']:
-        _pending_otps.pop(tutor_id, None)
+    if datetime.utcnow() > rec.expires_at:
+        _clear_otp(tutor_id)
         return 'expired'
-    rec['attempts'] += 1
-    if rec['attempts'] > MAX_OTP_ATTEMPTS:
-        _pending_otps.pop(tutor_id, None)
+    rec.attempts += 1
+    db.session.commit()
+    if rec.attempts > MAX_OTP_ATTEMPTS:
+        _clear_otp(tutor_id)
         return 'locked'
     entered_hash = hashlib.sha256(entered.encode()).hexdigest()
-    if secrets.compare_digest(entered_hash, rec['otp_hash']):
-        _pending_otps.pop(tutor_id, None)
+    if secrets.compare_digest(entered_hash, rec.otp_hash):
+        _clear_otp(tutor_id)
         return 'ok'
     return 'bad'
 

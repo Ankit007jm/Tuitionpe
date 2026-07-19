@@ -323,8 +323,8 @@ def remind_class_email(id):
         ok = rem_send_email(app, parent_email, subject, html)
         print(f"[TuitionPe] Class email reminder {'sent' if ok else 'FAILED'} -> {parent_email}")
 
-    t = threading.Thread(target=_send_bg, daemon=True)
-    t.start()
+    from utils import run_async
+    run_async(_send_bg)
 
     flash(f'Email reminder with Google Calendar link sent to {parent_email}!', 'success')
     return redirect(url_for('schedule.schedule', day=sched.day_of_week))
@@ -430,8 +430,8 @@ def remind_all_email():
             ok = rem_send_email(app_ctx, to_email, subj, body)
             print(f"[TuitionPe] Bulk email {'sent' if ok else 'FAILED'} -> {to_email}")
 
-        t = threading.Thread(target=_send_bg, args=(app, parent_email, subject, html), daemon=True)
-        t.start()
+        from utils import run_async
+        run_async(_send_bg, app, parent_email, subject, html)
         sent_count += 1
 
     if sent_count > 0:

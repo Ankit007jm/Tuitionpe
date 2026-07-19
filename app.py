@@ -12,8 +12,11 @@ from models import db, Tutor
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config.from_object(Config)
 
-# Ensure upload folder exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Ensure upload folder exists (read-only FS on serverless — Cloudinary is used there)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+except OSError:
+    pass
 
 # Initialize extensions
 db.init_app(app)
@@ -228,9 +231,42 @@ with app.app_context():
     except Exception as e:
         print(f"[TuitionPe] Overdue migration note: {e}")
 
-# Start the background reminder scheduler (daily + per-class emails)
-from reminder import init_reminders
-init_reminders(app)
+# Start the background reminder scheduler (daily + per-class emails).
+# On serverless (Vercel) there is no long-lived process — reminders run
+# via the /cron/* endpoints below instead.
+if not os.environ.get('VERCEL'):
+    from reminder import init_reminders
+    init_reminders(app)
+
+
+# ── Cron endpoints (for Vercel Cron / external schedulers) ──────
+# Protected by CRON_SECRET: requests must send
+#   Authorization: Bearer <CRON_SECRET>
+def _cron_authorized():
+    secret = os.environ.get('CRON_SECRET', '')
+    if not secret:
+        return False
+    auth = request.headers.get('Authorization', '')
+    import secrets as _s
+    return auth.startswith('Bearer ') and _s.compare_digest(auth[7:], secret)
+
+
+@app.route('/cron/daily-reminders')
+def cron_daily_reminders():
+    if not _cron_authorized():
+        abort(401)
+    from reminder import send_daily_reminders
+    send_daily_reminders(app)
+    return {'ok': True, 'job': 'daily-reminders'}
+
+
+@app.route('/cron/class-alerts')
+def cron_class_alerts():
+    if not _cron_authorized():
+        abort(401)
+    from reminder import send_class_reminders
+    send_class_reminders(app)
+    return {'ok': True, 'job': 'class-alerts'}
 
 if __name__ == '__main__':
     # use_reloader=False prevents APScheduler from starting twice in debug mode.

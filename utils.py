@@ -38,3 +38,19 @@ def upload_image(file, filename):
     with open(os.path.join(upload_dir, filename), 'wb') as f:
         f.write(file_bytes)
     return f"uploads/{filename}"
+
+
+def run_async(target, *args):
+    """Run target(*args) in a background thread — or inline on serverless.
+
+    On Vercel (serverless) the process is frozen as soon as the response
+    returns, killing daemon threads mid-send. There we run synchronously.
+    """
+    if os.environ.get('VERCEL'):
+        try:
+            target(*args)
+        except Exception as e:
+            print(f"[TuitionPe] background task failed inline: {e}")
+        return
+    import threading
+    threading.Thread(target=target, args=args, daemon=True).start()

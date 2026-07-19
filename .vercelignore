@@ -1,0 +1,8 @@
+database.db
+flask_*.log
+__pycache__/
+*.pyc
+tests/
+static/uploads/*
+.claude/
+.env

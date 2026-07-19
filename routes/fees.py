@@ -311,12 +311,8 @@ def send_receipt_email_route(id):
     app = current_app._get_current_object()
     parent_email = student.parent_email
 
-    t = threading.Thread(
-        target=_send_receipt_bg,
-        args=(app, current_user.id, student.id, payment.id),
-        daemon=True
-    )
-    t.start()
+    from utils import run_async
+    run_async(_send_receipt_bg, app, current_user.id, student.id, payment.id)
 
     flash(f'Receipt is being sent to {parent_email}! Check your inbox in a moment.', 'success')
     month = payment.month_year[:7]
