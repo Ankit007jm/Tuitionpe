@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service{% endblock %}
+
+{% block content %}
+<div class="min-h-screen px-4 py-10 relative z-10">
+    <div class="max-w-2xl mx-auto">
+        <a href="{{ url_for('auth.login') if not current_user.is_authenticated else url_for('dashboard.dashboard') }}"
+           class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-accent mb-6 transition-colors">
+            <i class="fas fa-arrow-left text-xs"></i> Back
+        </a>
+
+        <div class="card-dark rounded-3xl p-7 sm:p-9">
+            <p class="section-label mb-2">Legal</p>
+            <h1 class="page-title mb-2">Terms of Service</h1>
+            <p class="text-gray-500 text-sm mb-8">Last updated: 15 July 2026</p>
+
+            <div class="space-y-6 text-sm leading-relaxed text-gray-400">
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">1. About TuitionPe</h2>
+                    <p>TuitionPe is a tuition management tool that helps tutors manage students, class schedules, attendance, and fee records. By creating an account or using the service, you agree to these terms.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">2. Your Account</h2>
+                    <p>You are responsible for keeping your login credentials safe and for all activity under your account. Provide accurate information, including a valid phone number, which is used to sign in.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">3. Your Data</h2>
+                    <p>Student and parent details you add belong to you. You confirm you have the right to store this information and to contact parents (for example, fee reminders via WhatsApp or email). We store it only to provide the service — see our <a href="{{ url_for('auth.privacy') }}" class="text-accent hover:underline">Privacy Policy</a>.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">4. Payments Between You and Parents</h2>
+                    <p>TuitionPe records fee statuses and generates receipts and reminders, but does not process payments. Any UPI or bank details you display are yours; transactions happen directly between you and the payer.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">5. Acceptable Use</h2>
+                    <p>Do not use TuitionPe to send spam, store unlawful content, or attempt to access other users' data. We may suspend accounts that abuse the service.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">6. Service Availability</h2>
+                    <p>We aim for reliable service but provide TuitionPe "as is", without warranties. Keep your own backups of critical records. We are not liable for indirect losses, including missed reminders or fee disputes.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">7. Changes</h2>
+                    <p>We may update these terms as the product evolves. Continued use after an update means you accept the revised terms.</p>
+                </section>
+                <section>
+                    <h2 class="font-bold text-base mb-2 text-white">8. Contact</h2>
+                    <p>Questions about these terms? Reach out via the Help &amp; Support section in Settings.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

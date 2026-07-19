@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}India's Smart Tuition Platform{% endblock %}
+
+{% block content %}
+<div class="relative z-10 grid-bg min-h-screen flex flex-col">
+    <!-- Top bar -->
+    <header class="max-w-5xl mx-auto w-full px-4 py-5 flex items-center justify-between">
+        <span class="flex items-center gap-2 font-extrabold text-lg">
+            <span class="w-8 h-8 rounded-lg icon-chip gradient-accent"><i class="fas fa-graduation-cap text-xs"></i></span>
+            TuitionPe
+        </span>
+        <nav class="flex items-center gap-2 text-sm font-semibold">
+            <a href="{{ url_for('parents.parent_login') }}" class="px-3 py-2 text-gray-500 hover:text-accent transition-colors">Parent login</a>
+            <a href="{{ url_for('auth.login') }}" class="btn-outline px-4 py-2 rounded-xl text-sm">Teacher login</a>
+        </nav>
+    </header>
+
+    <!-- Hero -->
+    <div class="max-w-5xl mx-auto w-full px-4 flex-1 flex flex-col justify-center pb-16">
+        <div class="text-center pt-10 pb-10">
+            <p class="section-label mb-4">One platform, both sides of tuition</p>
+            <h1 class="page-title mb-4" style="font-size: clamp(30px, 5.5vw, 52px);">
+                Great teachers meet<br><span class="text-gradient-accent">eager students</span>
+            </h1>
+            <p class="text-gray-500 max-w-lg mx-auto">Teachers run their whole tuition business here. Parents find trusted, rated tutors and book a free demo class in minutes.</p>
+        </div>
+
+        <!-- Two paths -->
+        <div class="grid sm:grid-cols-2 gap-4 max-w-3xl mx-auto w-full">
+            <a href="{{ url_for('parents.find_teachers') }}" class="card-dark rounded-3xl p-7 block group" style="animation: slideUp 0.5s ease both; animation-delay: 0.1s;">
+                <div class="w-12 h-12 rounded-2xl icon-chip gradient-cyan mb-4"><i class="fas fa-search text-lg"></i></div>
+                <h2 class="text-lg font-bold mb-1.5">I'm looking for a teacher</h2>
+                <p class="text-gray-500 text-sm mb-4">Search rated tutors by subject, class, and city. Book a free demo and chat on WhatsApp instantly.</p>
+                <span class="text-accent text-sm font-bold">Find teachers <i class="fas fa-arrow-right ml-1 transition-transform group-hover:translate-x-1"></i></span>
+            </a>
+            <a href="{{ url_for('auth.signup') }}" class="card-dark rounded-3xl p-7 block group" style="animation: slideUp 0.5s ease both; animation-delay: 0.2s;">
+                <div class="w-12 h-12 rounded-2xl icon-chip gradient-green mb-4"><i class="fas fa-chalkboard-teacher text-lg"></i></div>
+                <h2 class="text-lg font-bold mb-1.5">I'm a teacher</h2>
+                <p class="text-gray-500 text-sm mb-4">Manage students, schedules, attendance, and fees. Get discovered by parents and grow your tuition.</p>
+                <span class="text-accent text-sm font-bold">Start free <i class="fas fa-arrow-right ml-1 transition-transform group-hover:translate-x-1"></i></span>
+            </a>
+        </div>
+
+        <!-- Feature strip -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto w-full mt-10">
+            {% for icon, label in [
+                ('fas fa-bolt', 'Demo in minutes'),
+                ('fas fa-star', 'Rated teachers'),
+                ('fas fa-rupee-sign', 'Fee tracking'),
+                ('fab fa-whatsapp', 'WhatsApp built in'),
+            ] %}
+            <div class="text-center" style="animation: slideUp 0.5s ease both; animation-delay: {{ 0.3 + loop.index0 * 0.08 }}s;">
+                <i class="{{ icon }} text-accent mb-2 text-lg"></i>
+                <p class="text-gray-500 text-xs font-semibold">{{ label }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t py-5" style="border-color: var(--border-default);">
+        <div class="max-w-5xl mx-auto px-4 flex items-center justify-between text-xs text-gray-600">
+            <span>© 2026 TuitionPe</span>
+            <span class="flex gap-4">
+                <a href="{{ url_for('auth.terms') }}" class="hover:text-accent">Terms</a>
+                <a href="{{ url_for('auth.privacy') }}" class="hover:text-accent">Privacy</a>
+            </span>
+        </div>
+    </footer>
+</div>
+{% endblock %}

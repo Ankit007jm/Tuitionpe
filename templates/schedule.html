@@ -4,14 +4,14 @@
 {% block content %}
 <div class="app-container pt-6 pb-24 relative z-10">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 fade-in">
         <div>
             <p class="text-gray-500 text-sm">Classes</p>
             <h1 class="text-2xl font-bold mt-1">Schedule</h1>
         </div>
         <a href="{{ url_for('schedule.attendance_tracker') }}"
            class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80"
-           style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+           style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
             <i class="fas fa-clipboard-check"></i> Track Attendance
         </a>
     </div>
@@ -31,36 +31,146 @@
     </div>
 
     <!-- Day Summary -->
-    <div class="card-dark rounded-2xl p-4 mb-5 border-l-4" style="border-left-color: #10b981;">
+    <div class="card-dark rounded-2xl p-4 mb-5 border-l-4" style="border-left-color: var(--success);">
         <div class="flex items-center justify-between">
             <div>
                 <div class="text-sm font-medium">{{ selected_info.full_date }}</div>
                 <div class="text-gray-500 text-xs mt-1">{{ schedule_data|length }} class{{ 'es' if schedule_data|length != 1 else '' }} scheduled</div>
             </div>
             {% if schedule_data and selected_info.is_today %}
-            <a href="{{ url_for('schedule.remind_all_today') }}"
-               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-               style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
-                <i class="fab fa-whatsapp"></i> Remind All
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('schedule.remind_all_today') }}"
+                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                   style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
+                    <i class="fab fa-whatsapp"></i> All
+                </a>
+                <a href="{{ url_for('schedule.remind_all_email') }}"
+                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                   style="background:var(--info-bg); color:var(--info); border:1px solid var(--info);">
+                    <i class="fas fa-envelope"></i> Email All
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>
 
     <!-- Timeline -->
-    {% if schedule_data %}
+    {% macro attendance_form(item) %}
+    <form method="POST" action="{{ url_for('schedule.mark_attendance', id=item.schedule.id) }}" class="grid grid-cols-4 gap-1.5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" name="attendance_status" value="completed"
+                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                {% if item.attendance and item.attendance.status == 'completed' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-white/5 text-gray-400 hover:bg-emerald-500/10 hover:text-emerald-400{% endif %}"
+                title="Present">
+            <i class="fas fa-check"></i> Present
+        </button>
+        <button type="submit" name="attendance_status" value="absent"
+                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                {% if item.attendance and item.attendance.status == 'absent' %}bg-red-500/20 text-red-400 border border-red-500/30{% else %}bg-white/5 text-gray-400 hover:bg-red-500/10 hover:text-red-400{% endif %}"
+                title="Absent">
+            <i class="fas fa-user-slash"></i> Absent
+        </button>
+        <button type="submit" name="attendance_status" value="cancelled"
+                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                {% if item.attendance and item.attendance.status == 'cancelled' %}bg-gray-500/20 text-gray-300 border border-gray-500/30{% else %}bg-white/5 text-gray-400 hover:bg-gray-500/10 hover:text-gray-300{% endif %}"
+                title="Cancelled">
+            <i class="fas fa-ban"></i> Cancel
+        </button>
+        <button type="submit" name="attendance_status" value="rescheduled"
+                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
+                {% if item.attendance and item.attendance.status == 'rescheduled' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}bg-white/5 text-gray-400 hover:bg-orange-500/10 hover:text-orange-400{% endif %}"
+                title="Rescheduled">
+            <i class="fas fa-calendar-day"></i> Resched
+        </button>
+    </form>
+    {% endmacro %}
+
+    {% macro row_actions(item) %}
+    <div class="flex items-center gap-2">
+        <a href="{{ url_for('schedule.remind_class', id=item.schedule.id) }}" target="_blank"
+           class="text-green-500 hover:text-green-400 text-xs" title="Send WhatsApp Reminder">
+            <i class="fab fa-whatsapp text-base"></i>
+        </a>
+        {% if item.student.parent_email %}
+        <a href="{{ url_for('schedule.remind_class_email', id=item.schedule.id) }}"
+           class="text-blue-400 hover:text-blue-300 text-xs" title="Send Email Reminder with Google Calendar">
+            <i class="fas fa-envelope text-base"></i>
+        </a>
+        {% endif %}
+        <form method="POST" action="{{ url_for('schedule.delete_schedule', id=item.schedule.id) }}" onsubmit="return confirm('Remove this class?');" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="text-gray-600 hover:text-red-400 text-xs" title="Remove class">
+                <i class="fas fa-times"></i>
+            </button>
+        </form>
+    </div>
+    {% endmacro %}
+
+    {% if groups %}
     <div class="space-y-0">
-        {% for item in schedule_data %}
+        {% for group in groups %}
         <div class="flex gap-4 mb-4">
             <!-- Time Column -->
             <div class="flex flex-col items-center" style="min-width: 50px;">
-                <div class="text-sm font-semibold text-emerald-500">{{ item.schedule.start_time }}</div>
+                <div class="text-sm font-semibold text-emerald-500">{{ group.start_time|format_time_12hr }}</div>
                 <div class="timeline-dot mt-2"></div>
                 {% if not loop.last %}
                 <div class="timeline-line flex-1"></div>
                 {% endif %}
             </div>
-            <!-- Card -->
+
+            {% if group.is_batch %}
+            <!-- Batch Card: one slot, multiple students -->
+            <div class="flex-1 card-dark rounded-2xl p-4 mb-2" style="border-left: 3px solid var(--accent);">
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="w-10 h-10 rounded-xl icon-chip gradient-cyan">
+                        <i class="fas fa-users text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-sm">{{ group.batch_name }}</div>
+                        <div class="text-gray-500 text-xs">
+                            {{ group.entries|length }} students &bull; {{ group.class_type }}
+                            {% if group.end_time %} &bull; {{ group.start_time|format_time_12hr }} - {{ group.end_time|format_time_12hr }}{% endif %}
+                        </div>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold" style="background:var(--accent-tint);color:var(--accent-dark);">BATCH</span>
+                </div>
+                <div>
+                    {% for item in group.entries %}
+                    <div class="py-3 {{ 'border-t border-white/5' if not loop.first else '' }}">
+                        <div class="flex items-center gap-3">
+                            {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange'] %}
+                            <div class="w-8 h-8 {{ gradients[loop.index0 % 5] }} rounded-lg flex items-center justify-center avatar text-[10px]">
+                                {{ item.initials }}
+                            </div>
+                            <div class="flex-1">
+                                <div class="font-medium text-sm">{{ item.student.student_name }}</div>
+                                <div class="text-gray-500 text-xs">{{ item.student.subject }}</div>
+                            </div>
+                            {% if item.attendance %}
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full
+                                {% if item.attendance.status == 'completed' %}bg-emerald-500/10 text-emerald-500
+                                {% elif item.attendance.status == 'absent' %}bg-red-500/10 text-red-400
+                                {% elif item.attendance.status == 'rescheduled' %}bg-orange-500/10 text-orange-400
+                                {% else %}bg-gray-500/10 text-gray-400{% endif %}">
+                                {{ item.attendance.status|capitalize }}
+                            </span>
+                            {% endif %}
+                            {{ row_actions(item) }}
+                        </div>
+                        {% if selected_info.is_today %}
+                        <div class="mt-2">
+                            {{ attendance_form(item) }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% else %}
+            {% set item = group.entries[0] %}
+            <!-- Single Class Card -->
             <div class="flex-1 card-dark rounded-2xl p-4 mb-2">
                 <div class="flex items-center gap-3">
                     {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange'] %}
@@ -71,22 +181,11 @@
                         <div class="font-medium text-sm">{{ item.student.student_name }}</div>
                         <div class="text-gray-500 text-xs">{{ item.student.subject }} - {{ item.schedule.class_type }}</div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <a href="{{ url_for('schedule.remind_class', id=item.schedule.id) }}" target="_blank"
-                           class="text-green-500 hover:text-green-400 text-xs" title="Send WhatsApp Reminder">
-                            <i class="fab fa-whatsapp text-base"></i>
-                        </a>
-                        <form method="POST" action="{{ url_for('schedule.delete_schedule', id=item.schedule.id) }}" onsubmit="return confirm('Remove this class?');" class="inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="text-gray-600 hover:text-red-400 text-xs" title="Remove class">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </form>
-                    </div>
+                    {{ row_actions(item) }}
                 </div>
                 {% if item.schedule.end_time %}
                 <div class="text-gray-600 text-xs mt-2">
-                    <i class="fas fa-clock mr-1"></i> {{ item.schedule.start_time }} - {{ item.schedule.end_time }}
+                    <i class="fas fa-clock mr-1"></i> {{ item.schedule.start_time|format_time_12hr }} - {{ item.schedule.end_time|format_time_12hr }}
                 </div>
                 {% endif %}
 
@@ -105,36 +204,11 @@
                         </span>
                     </div>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('schedule.mark_attendance', id=item.schedule.id) }}" class="grid grid-cols-4 gap-1.5">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" name="attendance_status" value="completed"
-                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
-                                {% if item.attendance and item.attendance.status == 'completed' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-white/5 text-gray-400 hover:bg-emerald-500/10 hover:text-emerald-400{% endif %}"
-                                title="Present">
-                            <i class="fas fa-check"></i> Present
-                        </button>
-                        <button type="submit" name="attendance_status" value="absent"
-                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
-                                {% if item.attendance and item.attendance.status == 'absent' %}bg-red-500/20 text-red-400 border border-red-500/30{% else %}bg-white/5 text-gray-400 hover:bg-red-500/10 hover:text-red-400{% endif %}"
-                                title="Absent">
-                            <i class="fas fa-user-slash"></i> Absent
-                        </button>
-                        <button type="submit" name="attendance_status" value="cancelled"
-                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
-                                {% if item.attendance and item.attendance.status == 'cancelled' %}bg-gray-500/20 text-gray-300 border border-gray-500/30{% else %}bg-white/5 text-gray-400 hover:bg-gray-500/10 hover:text-gray-300{% endif %}"
-                                title="Cancelled">
-                            <i class="fas fa-ban"></i> Cancel
-                        </button>
-                        <button type="submit" name="attendance_status" value="rescheduled"
-                                class="py-1.5 rounded-lg text-[10px] font-medium transition-all
-                                {% if item.attendance and item.attendance.status == 'rescheduled' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}bg-white/5 text-gray-400 hover:bg-orange-500/10 hover:text-orange-400{% endif %}"
-                                title="Rescheduled">
-                            <i class="fas fa-calendar-day"></i> Resched
-                        </button>
-                    </form>
+                    {{ attendance_form(item) }}
                 </div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -162,23 +236,58 @@
                 <input type="hidden" name="day_of_week" value="{{ selected_day }}">
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-gray-400 text-xs mb-1">Student *</label>
-                        <select name="student_id" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm" required>
-                            <option value="">Select student</option>
+                        <label class="block text-gray-400 text-xs mb-1">Students * <span class="text-gray-600">(pick more than one for a batch)</span></label>
+                        <div class="input-dark rounded-xl py-2 px-3 text-sm max-h-36 overflow-y-auto space-y-1" id="studentPicker">
                             {% for s in students %}
-                            <option value="{{ s.id }}">{{ s.student_name }} ({{ s.subject }})</option>
+                            <label class="flex items-center gap-2 py-1 cursor-pointer hover:text-accent transition-colors">
+                                <input type="checkbox" name="student_ids" value="{{ s.id }}" onchange="toggleBatchField()">
+                                <span>{{ s.student_name }} <span class="text-gray-500 text-xs">({{ s.subject }})</span></span>
+                            </label>
                             {% endfor %}
-                        </select>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-gray-400 text-xs mb-1">Start Time *</label>
-                            <input type="time" name="start_time" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm" required>
+                    <div id="batchNameField" style="display:none;">
+                        <label class="block text-gray-400 text-xs mb-1">Batch Name <span class="text-gray-600">(optional, e.g. "Class 10 Maths")</span></label>
+                        <input type="text" name="batch_name" maxlength="60" placeholder="Group class"
+                               class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm">
+                    </div>
+                    <!-- Start Time (12hr AM/PM) -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Start Time *</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <select id="startHour" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center" required>
+                                <option value="">Hr</option>
+                                {% for h in range(1, 13) %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
+                            </select>
+                            <select id="startMinute" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center" required>
+                                <option value="">Min</option>
+                                {% for m in range(0, 60, 5) %}<option value="{{ '%02d'|format(m) }}">{{ '%02d'|format(m) }}</option>{% endfor %}
+                            </select>
+                            <select id="startAmpm" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
                         </div>
-                        <div>
-                            <label class="block text-gray-400 text-xs mb-1">End Time</label>
-                            <input type="time" name="end_time" class="w-full input-dark rounded-xl py-2.5 px-3 text-white text-sm">
+                        <input type="hidden" name="start_time" id="startTimeHidden">
+                    </div>
+                    <!-- End Time (12hr AM/PM) -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">End Time</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <select id="endHour" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="">Hr</option>
+                                {% for h in range(1, 13) %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
+                            </select>
+                            <select id="endMinute" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="">Min</option>
+                                {% for m in range(0, 60, 5) %}<option value="{{ '%02d'|format(m) }}">{{ '%02d'|format(m) }}</option>{% endfor %}
+                            </select>
+                            <select id="endAmpm" class="input-dark rounded-xl py-2.5 px-2 text-white text-sm text-center">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
                         </div>
+                        <input type="hidden" name="end_time" id="endTimeHidden">
                     </div>
                     <div>
                         <label class="block text-gray-400 text-xs mb-1">Type</label>
@@ -205,4 +314,55 @@
 {% block nav %}
 {% include "components/sidebar.html" %}
 {% include "components/bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Show the batch-name field when 2+ students are selected
+function toggleBatchField() {
+    var checked = document.querySelectorAll('#studentPicker input[type="checkbox"]:checked').length;
+    var field = document.getElementById('batchNameField');
+    if (field) field.style.display = checked > 1 ? '' : 'none';
+}
+
+// Convert 12hr time selectors to 24hr HH:MM for hidden input
+function convertTo24(hourSel, minuteSel, ampmSel) {
+    var h = parseInt(hourSel.value);
+    var m = minuteSel.value;
+    var ampm = ampmSel.value;
+    if (!h || m === '') return '';
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return (h < 10 ? '0' + h : h) + ':' + m;
+}
+
+function updateHiddenTimes() {
+    var sh = document.getElementById('startHour');
+    var sm = document.getElementById('startMinute');
+    var sa = document.getElementById('startAmpm');
+    var eh = document.getElementById('endHour');
+    var em = document.getElementById('endMinute');
+    var ea = document.getElementById('endAmpm');
+    document.getElementById('startTimeHidden').value = convertTo24(sh, sm, sa);
+    document.getElementById('endTimeHidden').value = convertTo24(eh, em, ea);
+}
+
+// Attach change events
+['startHour','startMinute','startAmpm','endHour','endMinute','endAmpm'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', updateHiddenTimes);
+});
+
+// Convert 24hr to 12hr for display
+function to12hr(time24) {
+    if (!time24) return '';
+    var parts = time24.split(':');
+    var h = parseInt(parts[0]);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    if (h === 0) h = 12;
+    else if (h > 12) h -= 12;
+    return h + ':' + m + ' ' + ampm;
+}
+</script>
 {% endblock %}

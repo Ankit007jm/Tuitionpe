@@ -15,48 +15,31 @@
                 extend: {
                     fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
                     colors: {
-                        dark: { 900: '#050505', 800: '#0a0a0a', 700: '#121212', 600: '#1a1a1a', 500: '#222222' },
-                        accent: { DEFAULT: '#10b981', light: '#34d399', dark: '#059669' }
+                        dark: { 900: '#0b1210', 800: '#101a17', 700: '#15211d', 600: '#1a2824', 500: '#20302b' },
+                        accent: { DEFAULT: '#0d9488', light: '#14b8a6', dark: '#0f766e' }
                     }
                 }
             }
         }
     </script>
 </head>
-<body class="min-h-screen text-white bg-dark-900">
+<script>
+    // Apply saved theme BEFORE paint to avoid flash (light is the default)
+    (function() {
+        var t = localStorage.getItem('tp_theme') || 'light';
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+</script>
+<body class="min-h-screen">
     <!-- Loading Screen — only on first visit per session -->
     <div class="loading-screen" id="loading" style="display:none;">
         <div class="loader-ring"></div>
-        <p class="loading-text">TUITIONPE</p>
+        <p class="loading-text">TUITION<span style="opacity:0.4">PE</span></p>
     </div>
     <script>
         (function() {
             if (!sessionStorage.getItem('tp_loaded')) {
                 document.getElementById('loading').style.display = '';
-            }
-        })();
-    </script>
-
-    <!-- Twinkling Stars Background -->
-    <div class="stars-bg" id="starsBg">
-        <!-- Green glow orbs for ambient light -->
-        <div class="glow-orb" style="width:400px;height:400px;background:#10b981;top:-100px;right:-100px;"></div>
-        <div class="glow-orb" style="width:300px;height:300px;background:#059669;bottom:10%;left:-80px;"></div>
-        <div class="glow-orb" style="width:200px;height:200px;background:#10b981;top:50%;right:20%;"></div>
-    </div>
-    <script>
-        // Generate twinkling stars dynamically
-        (function() {
-            var bg = document.getElementById('starsBg');
-            if (!bg) return;
-            for (var i = 0; i < 80; i++) {
-                var s = document.createElement('div');
-                s.className = 'star' + (Math.random() > 0.85 ? ' large' : '');
-                s.style.left = Math.random() * 100 + '%';
-                s.style.top = Math.random() * 100 + '%';
-                s.style.setProperty('--dur', (2 + Math.random() * 4) + 's');
-                s.style.setProperty('--delay', (Math.random() * 3) + 's');
-                bg.appendChild(s);
             }
         })();
     </script>
@@ -124,6 +107,56 @@
             const modal = document.getElementById('comingSoonModal');
             if (modal) modal.classList.remove('active');
         }
+    </script>
+    <script>
+    // Theme toggle logic (light is the default)
+    function getTheme() { return localStorage.getItem('tp_theme') || 'light'; }
+
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        localStorage.setItem('tp_theme', theme);
+        updateThemeUI(theme);
+    }
+
+    function toggleTheme() {
+        var current = getTheme();
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    function updateThemeUI(theme) {
+        var track = document.getElementById('themeToggle');
+        var label = document.getElementById('themeLabel');
+        var icon = document.getElementById('themeIcon');
+        if (track) {
+            if (theme === 'light') {
+                track.classList.add('light');
+            } else {
+                track.classList.remove('light');
+            }
+        }
+        if (label) label.textContent = theme === 'light' ? 'Light mode' : 'Dark mode';
+        if (icon) icon.innerHTML = theme === 'light'
+            ? '<i class="fas fa-sun" style="color:#fff;font-size:10px;"></i>'
+            : '<i class="fas fa-moon" style="color:#071512;font-size:10px;"></i>';
+
+        // Sidebar quick toggle: show the mode you'd switch TO
+        document.querySelectorAll('.theme-quick-icon').forEach(function(el) {
+            el.classList.toggle('fa-moon', theme === 'light');
+            el.classList.toggle('fa-sun', theme !== 'light');
+        });
+        document.querySelectorAll('.theme-quick-label').forEach(function(el) {
+            el.textContent = theme === 'light' ? 'Dark mode' : 'Light mode';
+        });
+    }
+
+    // Init theme UI on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateThemeUI(getTheme());
+    });
     </script>
     {% block scripts %}{% endblock %}
 </body>

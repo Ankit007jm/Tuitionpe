@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 # Load .env file so MAIL_USERNAME, MAIL_PASSWORD etc. are available
 load_dotenv()
 
-from flask import Flask, redirect, url_for, session, request, abort
+from flask import Flask, redirect, url_for, session, request, abort, render_template
 from flask_login import LoginManager
 from config import Config
 from models import db, Tutor
@@ -12,13 +12,34 @@ from models import db, Tutor
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config.from_object(Config)
 
-# Ensure upload folder exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Ensure upload folder exists (read-only FS on serverless — Cloudinary is used there)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+except OSError:
+    pass
 
 # Initialize extensions
 db.init_app(app)
 
 # ── Template filter: converts stored image path or Cloudinary URL → src URL ──
+@app.template_filter('format_time_12hr')
+def format_time_12hr(time_str):
+    """Convert 24hr HH:MM to 12hr format like '2:30 PM'."""
+    if not time_str:
+        return ''
+    try:
+        parts = time_str.split(':')
+        h = int(parts[0])
+        m = parts[1]
+        ampm = 'PM' if h >= 12 else 'AM'
+        if h == 0:
+            h = 12
+        elif h > 12:
+            h -= 12
+        return f'{h}:{m} {ampm}'
+    except (ValueError, IndexError):
+        return time_str
+
 @app.template_filter('img_url')
 def img_url_filter(path):
     if not path:
@@ -30,6 +51,7 @@ def img_url_filter(path):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
+login_manager.session_protection = 'strong'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -41,15 +63,25 @@ import secrets
 
 @app.before_request
 def csrf_protect():
-    """Validate CSRF token on all POST requests."""
+    """Validate CSRF token on all POST requests (timing-safe comparison)."""
     if request.method == 'POST':
         token = session.get('csrf_token')
-        form_token = request.form.get('csrf_token')
-        if not token or token != form_token:
+        form_token = request.form.get('csrf_token') or ''
+        if not token or not secrets.compare_digest(token, form_token):
             # Allow if the token is in the header (for AJAX)
-            header_token = request.headers.get('X-CSRFToken')
-            if not token or token != header_token:
+            header_token = request.headers.get('X-CSRFToken') or ''
+            if not token or not secrets.compare_digest(token, header_token):
                 abort(400, 'CSRF token missing or invalid. Please refresh the page and try again.')
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    if os.environ.get('RENDER') or os.environ.get('FORCE_SECURE_COOKIES'):
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
 
 @app.context_processor
 def inject_csrf_token():
@@ -67,7 +99,11 @@ from routes.schedule import schedule_bp
 from routes.fees import fees_bp
 from routes.profile import profile_bp
 from routes.payment_page import pay_bp
+from routes.booking import booking_bp
+from routes.parents import parents_bp
 
+app.register_blueprint(booking_bp)
+app.register_blueprint(parents_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(students_bp)
@@ -81,7 +117,9 @@ def index():
     from flask_login import current_user
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.dashboard'))
-    return redirect(url_for('auth.login'))
+    if session.get('parent_id'):
+        return redirect(url_for('parents.find_teachers'))
+    return render_template('landing.html')
 
 # Create tables + migrate missing columns
 with app.app_context():
@@ -104,10 +142,28 @@ with app.app_context():
                 cursor.execute("ALTER TABLE tutors ADD COLUMN reminder_minute INTEGER DEFAULT 0")
             if 'pay_token' not in existing:
                 cursor.execute("ALTER TABLE tutors ADD COLUMN pay_token VARCHAR(32)")
+            if 'booking_token' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN booking_token VARCHAR(32)")
+            if 'discoverable' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN discoverable BOOLEAN DEFAULT 0")
+            if 'city' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN city VARCHAR(100)")
+            if 'teaching_mode' not in existing:
+                cursor.execute("ALTER TABLE tutors ADD COLUMN teaching_mode VARCHAR(20) DEFAULT 'both'")
+
+            sch_cols = [row[1] for row in cursor.execute("PRAGMA table_info(schedules)").fetchall()]
+            if 'batch_name' not in sch_cols:
+                cursor.execute("ALTER TABLE schedules ADD COLUMN batch_name VARCHAR(60)")
+
+            dr_cols = [row[1] for row in cursor.execute("PRAGMA table_info(demo_requests)").fetchall()]
+            if dr_cols and 'parent_id' not in dr_cols:
+                cursor.execute("ALTER TABLE demo_requests ADD COLUMN parent_id INTEGER REFERENCES parents(id)")
 
             stu_cols = [row[1] for row in cursor.execute("PRAGMA table_info(students)").fetchall()]
             if 'parent_email' not in stu_cols:
                 cursor.execute("ALTER TABLE students ADD COLUMN parent_email VARCHAR(100)")
+            if 'date_of_joining' not in stu_cols:
+                cursor.execute("ALTER TABLE students ADD COLUMN date_of_joining DATE")
 
             pay_cols = [row[1] for row in cursor.execute("PRAGMA table_info(payments)").fetchall()]
             if 'due_date' not in pay_cols:
@@ -134,6 +190,31 @@ with app.app_context():
         if 'parent_email' not in stu_cols:
             db.session.execute(text('ALTER TABLE students ADD COLUMN parent_email VARCHAR(100)'))
             db.session.commit()
+        if 'date_of_joining' not in stu_cols:
+            db.session.execute(text('ALTER TABLE students ADD COLUMN date_of_joining DATE'))
+            db.session.commit()
+        tut_cols = [c['name'] for c in inspector.get_columns('tutors')]
+        if 'booking_token' not in tut_cols:
+            db.session.execute(text('ALTER TABLE tutors ADD COLUMN booking_token VARCHAR(32)'))
+            db.session.commit()
+        sch_cols = [c['name'] for c in inspector.get_columns('schedules')]
+        if 'batch_name' not in sch_cols:
+            db.session.execute(text('ALTER TABLE schedules ADD COLUMN batch_name VARCHAR(60)'))
+            db.session.commit()
+        if 'discoverable' not in tut_cols:
+            db.session.execute(text('ALTER TABLE tutors ADD COLUMN discoverable BOOLEAN DEFAULT FALSE'))
+            db.session.commit()
+        if 'city' not in tut_cols:
+            db.session.execute(text('ALTER TABLE tutors ADD COLUMN city VARCHAR(100)'))
+            db.session.commit()
+        if 'teaching_mode' not in tut_cols:
+            db.session.execute(text("ALTER TABLE tutors ADD COLUMN teaching_mode VARCHAR(20) DEFAULT 'both'"))
+            db.session.commit()
+        if inspector.has_table('demo_requests'):
+            dr_cols = [c['name'] for c in inspector.get_columns('demo_requests')]
+            if 'parent_id' not in dr_cols:
+                db.session.execute(text('ALTER TABLE demo_requests ADD COLUMN parent_id INTEGER'))
+                db.session.commit()
     except Exception as e:
         print(f"[TuitionPe] Column migration note: {e}")
 
@@ -150,10 +231,46 @@ with app.app_context():
     except Exception as e:
         print(f"[TuitionPe] Overdue migration note: {e}")
 
-# Start the background reminder scheduler (daily + per-class emails)
-from reminder import init_reminders
-init_reminders(app)
+# Start the background reminder scheduler (daily + per-class emails).
+# On serverless (Vercel) there is no long-lived process — reminders run
+# via the /cron/* endpoints below instead.
+if not os.environ.get('VERCEL'):
+    from reminder import init_reminders
+    init_reminders(app)
+
+
+# ── Cron endpoints (for Vercel Cron / external schedulers) ──────
+# Protected by CRON_SECRET: requests must send
+#   Authorization: Bearer <CRON_SECRET>
+def _cron_authorized():
+    secret = os.environ.get('CRON_SECRET', '')
+    if not secret:
+        return False
+    auth = request.headers.get('Authorization', '')
+    import secrets as _s
+    return auth.startswith('Bearer ') and _s.compare_digest(auth[7:], secret)
+
+
+@app.route('/cron/daily-reminders')
+def cron_daily_reminders():
+    if not _cron_authorized():
+        abort(401)
+    from reminder import send_daily_reminders
+    send_daily_reminders(app)
+    return {'ok': True, 'job': 'daily-reminders'}
+
+
+@app.route('/cron/class-alerts')
+def cron_class_alerts():
+    if not _cron_authorized():
+        abort(401)
+    from reminder import send_class_reminders
+    send_class_reminders(app)
+    return {'ok': True, 'job': 'class-alerts'}
 
 if __name__ == '__main__':
-    # use_reloader=False prevents APScheduler from starting twice in debug mode
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    # use_reloader=False prevents APScheduler from starting twice in debug mode.
+    # Bind to localhost by default — debug mode exposes the Werkzeug debugger
+    # (remote code execution) to anyone who can reach the port. Set
+    # HOST=0.0.0.0 explicitly to test from other devices on your network.
+    app.run(debug=True, host=os.environ.get('HOST', '127.0.0.1'), port=5000, use_reloader=False)

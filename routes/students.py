@@ -1,8 +1,9 @@
 import re
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, Response
 from flask_login import login_required, current_user
-from models import db, Student, Payment, Schedule
-from datetime import datetime
+from models import db, Student, Payment, Schedule, Attendance
+from sqlalchemy import func
+from datetime import datetime, date
 import os
 
 students_bp = Blueprint('students', __name__)
@@ -54,13 +55,29 @@ def student_list():
 
     # Get fee status for each student
     current_month = datetime.now().strftime('%Y-%m')
+
+    # Attendance rate per student (completed vs absent; cancelled excluded)
+    att_counts = {}
+    rows = db.session.query(
+        Attendance.student_id, Attendance.status, func.count(Attendance.id)
+    ).filter(
+        Attendance.tutor_id == current_user.id,
+        Attendance.status.in_(['completed', 'absent'])
+    ).group_by(Attendance.student_id, Attendance.status).all()
+    for sid, status, count in rows:
+        att_counts.setdefault(sid, {})[status] = count
+
     student_data = []
     for s in students:
         payment = Payment.query.filter_by(
             tutor_id=current_user.id, student_id=s.id, month_year=current_month
         ).first()
         fee_status = payment.status if payment else 'pending'
-        student_data.append({'student': s, 'fee_status': fee_status})
+        counts = att_counts.get(s.id, {})
+        attended = counts.get('completed', 0)
+        held = attended + counts.get('absent', 0)
+        att_pct = round(attended / held * 100) if held else None
+        student_data.append({'student': s, 'fee_status': fee_status, 'att_pct': att_pct})
 
     # Counts for filter tabs
     total = Student.query.filter_by(tutor_id=current_user.id, status='active').count()
@@ -127,6 +144,15 @@ def add_student():
                 filename = secure_filename(f"student_{parent_phone}_{file.filename}")
                 profile_image = upload_image(file, filename)
 
+        # Parse date of joining
+        doj_str = request.form.get('date_of_joining', '').strip()
+        date_of_joining = None
+        if doj_str:
+            try:
+                date_of_joining = date.fromisoformat(doj_str)
+            except (ValueError, TypeError):
+                pass
+
         student = Student(
             tutor_id=current_user.id,
             student_name=name,
@@ -140,17 +166,19 @@ def add_student():
             student_type=student_type,
             notes=notes,
             profile_image=profile_image,
+            date_of_joining=date_of_joining,
         )
         db.session.add(student)
         db.session.commit()
 
-        # Create payment record for current month with due_date
+        # Create payment record for current month with due_date (pro-rata if mid-month join)
         current_month = datetime.now().strftime('%Y-%m')
-        from routes.fees import _get_due_date
+        from routes.fees import _get_due_date, calculate_prorata_amount
+        prorata_amount = calculate_prorata_amount(student, current_month)
         payment = Payment(
             tutor_id=current_user.id,
             student_id=student.id,
-            amount=fee_val,
+            amount=prorata_amount,
             month_year=current_month,
             due_date=_get_due_date(current_month),
             status='pending'
@@ -208,6 +236,13 @@ def edit_student(id):
         student.student_type = request.form.get('student_type', student.student_type)
         student.notes = request.form.get('notes', student.notes)
 
+        doj_str = request.form.get('date_of_joining', '').strip()
+        if doj_str:
+            try:
+                student.date_of_joining = date.fromisoformat(doj_str)
+            except (ValueError, TypeError):
+                pass
+
         if 'profile_image' in request.files:
             file = request.files['profile_image']
             if file and file.filename:
@@ -259,3 +294,149 @@ def permanently_delete_student(id):
     db.session.commit()
     flash(f'{name} and all related data permanently deleted.', 'success')
     return redirect(url_for('students.student_list', archived='1'))
+
+
+# ────────────────────────────────────────────────────────────
+# Student Progress Report (PDF for parents)
+# ────────────────────────────────────────────────────────────
+
+@students_bp.route('/students/<int:id>/progress-report')
+@login_required
+def progress_report(id):
+    """Download a monthly progress report card PDF for a student."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        flash('PDF generation is not available on this server (fpdf2 missing).', 'error')
+        return redirect(url_for('students.student_list'))
+
+    student = Student.query.filter_by(id=id, tutor_id=current_user.id).first_or_404()
+
+    month = request.args.get('month', datetime.now().strftime('%Y-%m'))
+    try:
+        month_dt = datetime.strptime(month, '%Y-%m')
+        month_display = month_dt.strftime('%B %Y')
+    except ValueError:
+        flash('Invalid month.', 'error')
+        return redirect(url_for('students.student_list'))
+
+    from calendar import monthrange
+    first = date(month_dt.year, month_dt.month, 1)
+    last = date(month_dt.year, month_dt.month, monthrange(month_dt.year, month_dt.month)[1])
+
+    # Attendance: this month + overall
+    month_rows = Attendance.query.filter(
+        Attendance.tutor_id == current_user.id,
+        Attendance.student_id == student.id,
+        Attendance.date >= first, Attendance.date <= last,
+    ).order_by(Attendance.date).all()
+    all_rows = Attendance.query.filter_by(
+        tutor_id=current_user.id, student_id=student.id).all()
+
+    def _tally(rows):
+        c = {'completed': 0, 'absent': 0, 'cancelled': 0, 'rescheduled': 0}
+        for r in rows:
+            c[r.status] = c.get(r.status, 0) + 1
+        held = c['completed'] + c['absent']
+        pct = round(c['completed'] / held * 100) if held else None
+        return c, pct
+
+    m_counts, m_pct = _tally(month_rows)
+    a_counts, a_pct = _tally(all_rows)
+
+    payment = Payment.query.filter_by(
+        tutor_id=current_user.id, student_id=student.id, month_year=month).first()
+
+    TEAL = (13, 148, 136)
+    INK = (16, 32, 28)
+    MUTED = (125, 140, 136)
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
+
+    # Header band
+    pdf.set_fill_color(*TEAL)
+    pdf.rect(0, 0, 210, 34, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.set_xy(12, 8)
+    pdf.cell(0, 8, 'Student Progress Report')
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_xy(12, 17)
+    pdf.cell(0, 6, f'{month_display}  |  Tutor: {current_user.name}')
+
+    def label_value(label, value, bold=True):
+        pdf.set_text_color(*MUTED)
+        pdf.set_font('Helvetica', '', 11)
+        pdf.cell(62, 8, label)
+        pdf.set_text_color(*INK)
+        pdf.set_font('Helvetica', 'B' if bold else '', 11)
+        pdf.cell(0, 8, str(value), new_x='LMARGIN', new_y='NEXT')
+
+    # Student info
+    pdf.set_y(44)
+    pdf.set_text_color(*INK)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(0, 8, 'Student', new_x='LMARGIN', new_y='NEXT')
+    label_value('Name', student.student_name)
+    label_value('Class', student.class_grade or '-')
+    label_value('Subject', student.subject or '-')
+    if student.date_of_joining:
+        label_value('Learning since', student.date_of_joining.strftime('%d %b %Y'))
+
+    # Attendance
+    pdf.ln(4)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(*INK)
+    pdf.cell(0, 8, f'Attendance - {month_display}', new_x='LMARGIN', new_y='NEXT')
+    label_value('Classes attended', m_counts['completed'])
+    label_value('Classes missed', m_counts['absent'])
+    if m_counts['cancelled']:
+        label_value('Cancelled by tutor', m_counts['cancelled'])
+    label_value('Attendance rate (this month)', f'{m_pct}%' if m_pct is not None else 'No classes held')
+    label_value('Attendance rate (overall)', f'{a_pct}%' if a_pct is not None else '-')
+
+    # Fee status
+    pdf.ln(4)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(*INK)
+    pdf.cell(0, 8, 'Fee Status', new_x='LMARGIN', new_y='NEXT')
+    if payment:
+        status = payment.status.capitalize()
+        label_value('Fee for the month', f'Rs. {int(payment.amount)}')
+        pdf.set_text_color(*MUTED)
+        pdf.set_font('Helvetica', '', 11)
+        pdf.cell(62, 8, 'Status')
+        if payment.status == 'paid':
+            pdf.set_text_color(5, 150, 105)
+        elif payment.status == 'overdue':
+            pdf.set_text_color(220, 38, 38)
+        else:
+            pdf.set_text_color(217, 119, 6)
+        pdf.set_font('Helvetica', 'B', 11)
+        paid_on = f" (paid on {payment.paid_date.strftime('%d %b %Y')})" if payment.paid_date else ''
+        pdf.cell(0, 8, status + paid_on, new_x='LMARGIN', new_y='NEXT')
+    else:
+        label_value('Fee for the month', 'No record', bold=False)
+
+    # Tutor remarks
+    if student.notes:
+        pdf.ln(4)
+        pdf.set_font('Helvetica', 'B', 12)
+        pdf.set_text_color(*INK)
+        pdf.cell(0, 8, 'Tutor Remarks', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font('Helvetica', '', 11)
+        pdf.set_text_color(*MUTED)
+        pdf.multi_cell(0, 6, student.notes[:1000])
+
+    pdf.ln(8)
+    pdf.set_font('Helvetica', 'I', 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(0, 6, f'Generated by TuitionPe on {datetime.now().strftime("%d %b %Y")}')
+
+    data = bytes(pdf.output())
+    safe_name = ''.join(ch for ch in student.student_name if ch.isalnum() or ch in ' _-').strip().replace(' ', '_')
+    return Response(data, mimetype='application/pdf', headers={
+        'Content-Disposition': f'attachment; filename="Progress_{safe_name}_{month}.pdf"'
+    })

@@ -61,7 +61,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-gray-400 text-sm mb-2 font-medium">Full Name *</label>
-                        <input type="text" id="signupName" name="name" placeholder="Enter your full name" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600" required oninput="updateSignupInitials()">
+                        <input type="text" id="signupName" name="name" placeholder="Enter your full name" value="{{ prefill_name or '' }}" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600" required oninput="updateSignupInitials()">
                     </div>
                     <div>
                         <label class="block text-gray-400 text-sm mb-2 font-medium">Phone Number *</label>
@@ -73,7 +73,7 @@
                     </div>
                     <div>
                         <label class="block text-gray-400 text-sm mb-2 font-medium">Email Address</label>
-                        <input type="email" name="email" placeholder="your@email.com" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
+                        <input type="email" name="email" placeholder="your@email.com" value="{{ prefill_email or '' }}" class="w-full input-dark rounded-xl py-3 px-4 text-white placeholder-gray-600">
                         <p class="text-accent/70 text-xs mt-1.5"><i class="fas fa-shield-alt mr-1"></i>Required for password recovery</p>
                     </div>
                     <div>

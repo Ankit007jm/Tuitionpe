@@ -1,6 +1,6 @@
 import urllib.parse
 import threading
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, Response
 from flask_login import login_required, current_user
 from models import db, Student, Payment
 from sqlalchemy import func
@@ -101,6 +101,56 @@ def _get_due_date(month_year_str):
         return None
 
 
+def calculate_prorata_amount(student, month_year_str):
+    """
+    Calculate pro-rata fee for a student based on their date_of_joining.
+
+    Logic:
+    - If no date_of_joining or joined before the month, full fee applies.
+    - If joined in the given month, fee = (remaining_days / total_days) * fee_amount.
+    - For weekly: full weekly rate (no proration within a week).
+    - For daily/per_class: full rate always (already per-unit).
+    """
+    import math
+    if not student.date_of_joining:
+        return student.fee_amount
+
+    try:
+        y, m = map(int, month_year_str.split('-'))
+    except Exception:
+        return student.fee_amount
+
+    total_days = monthrange(y, m)[1]
+    first_of_month = date(y, m, 1)
+    last_of_month = date(y, m, total_days)
+
+    # If joined before this month, full fee
+    if student.date_of_joining < first_of_month:
+        return student.fee_amount
+
+    # If joined after this month ends, no fee
+    if student.date_of_joining > last_of_month:
+        return 0.0
+
+    # Student joined mid-month
+    join_day = student.date_of_joining.day
+
+    if student.payment_cycle in ('daily', 'per_class'):
+        # These are already per-unit — no proration needed
+        return student.fee_amount
+    elif student.payment_cycle == 'weekly':
+        # Calculate remaining full weeks (ceil) from joining date
+        remaining_days = total_days - join_day + 1
+        remaining_weeks = math.ceil(remaining_days / 7)
+        total_weeks = math.ceil(total_days / 7)
+        return round(student.fee_amount * remaining_weeks / total_weeks, 2)
+    else:
+        # monthly: prorate by day
+        remaining_days = total_days - join_day + 1
+        prorata = round(student.fee_amount * remaining_days / total_days, 2)
+        return prorata
+
+
 def _generate_weekly_payments(student, month_year_str):
     """Generate weekly payment records for a month if they don't exist."""
     try:
@@ -155,10 +205,13 @@ def fees():
                 tutor_id=current_user.id, student_id=student.id, month_year=selected_month
             ).first()
             if not existing:
+                prorata_amount = calculate_prorata_amount(student, selected_month)
+                if prorata_amount <= 0:
+                    continue  # student hasn't joined yet in this month
                 p = Payment(
                     tutor_id=current_user.id,
                     student_id=student.id,
-                    amount=student.fee_amount,
+                    amount=prorata_amount,
                     month_year=selected_month,
                     due_date=_get_due_date(selected_month),
                     status='pending'
@@ -184,8 +237,11 @@ def fees():
         student = Student.query.get(p.student_id)
         if student:
             initials = ''.join([w[0].upper() for w in student.student_name.split()[:2]])
+            is_prorata = (student.fee_amount and abs(p.amount - student.fee_amount) > 0.01
+                          and p.amount < student.fee_amount)
             payment_data.append({
-                'payment': p, 'student': student, 'initials': initials
+                'payment': p, 'student': student, 'initials': initials,
+                'is_prorata': is_prorata, 'full_fee': student.fee_amount,
             })
 
     # Month display
@@ -255,12 +311,8 @@ def send_receipt_email_route(id):
     app = current_app._get_current_object()
     parent_email = student.parent_email
 
-    t = threading.Thread(
-        target=_send_receipt_bg,
-        args=(app, current_user.id, student.id, payment.id),
-        daemon=True
-    )
-    t.start()
+    from utils import run_async
+    run_async(_send_receipt_bg, app, current_user.id, student.id, payment.id)
 
     flash(f'Receipt is being sent to {parent_email}! Check your inbox in a moment.', 'success')
     month = payment.month_year[:7]
@@ -431,3 +483,135 @@ def payment_history(student_id):
     return render_template('payment_history.html',
         student=student, payments=payments,
         total_paid=total_paid, total_pending=total_pending)
+
+
+# ────────────────────────────────────────────────────────────
+# Monthly Earnings Report (PDF download)
+# ────────────────────────────────────────────────────────────
+
+@fees_bp.route('/fees/report')
+@login_required
+def monthly_report():
+    """Download a PDF earnings report for the selected month."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        flash('PDF generation is not available on this server (fpdf2 missing).', 'error')
+        return redirect(url_for('fees.fees'))
+
+    month = request.args.get('month', datetime.now().strftime('%Y-%m'))
+    try:
+        month_display = datetime.strptime(month, '%Y-%m').strftime('%B %Y')
+    except ValueError:
+        flash('Invalid month.', 'error')
+        return redirect(url_for('fees.fees'))
+
+    payments = Payment.query.filter(
+        Payment.tutor_id == current_user.id,
+        Payment.month_year.startswith(month)
+    ).all()
+
+    collected = sum(p.amount for p in payments if p.status == 'paid')
+    pending = sum(p.amount for p in payments if p.status == 'pending')
+    overdue = sum(p.amount for p in payments if p.status == 'overdue')
+
+    students = {s.id: s for s in Student.query.filter_by(tutor_id=current_user.id).all()}
+    rows = []
+    for p in sorted(payments, key=lambda x: (students.get(x.student_id) and students[x.student_id].student_name or '', x.month_year)):
+        s = students.get(p.student_id)
+        if not s:
+            continue
+        rows.append((
+            s.student_name,
+            p.month_year,
+            f'Rs. {int(p.amount)}',
+            p.status.capitalize(),
+            p.paid_date.strftime('%d %b %Y') if p.paid_date else '-',
+        ))
+
+    TEAL = (13, 148, 136)
+    INK = (16, 32, 28)
+    MUTED = (125, 140, 136)
+    LINE = (227, 234, 232)
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
+
+    # Header band
+    pdf.set_fill_color(*TEAL)
+    pdf.rect(0, 0, 210, 30, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.set_xy(12, 8)
+    pdf.cell(0, 8, 'TuitionPe - Earnings Report')
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_xy(12, 17)
+    pdf.cell(0, 6, f'{current_user.name}  |  {month_display}')
+
+    # Summary
+    pdf.set_y(40)
+    pdf.set_text_color(*INK)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(0, 8, 'Summary', new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font('Helvetica', '', 11)
+    total = collected + pending + overdue
+    for label, value in (
+        ('Collected', collected), ('Pending', pending),
+        ('Overdue', overdue), ('Total billed', total),
+    ):
+        pdf.set_text_color(*MUTED)
+        pdf.cell(60, 8, label)
+        pdf.set_text_color(*INK)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.cell(0, 8, f'Rs. {int(value)}', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font('Helvetica', '', 11)
+
+    # Table
+    pdf.ln(4)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(*INK)
+    pdf.cell(0, 8, 'Payment Details', new_x='LMARGIN', new_y='NEXT')
+
+    col_w = (58, 30, 30, 28, 40)
+    headers = ('Student', 'Period', 'Amount', 'Status', 'Paid On')
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.set_fill_color(240, 244, 243)
+    pdf.set_text_color(*MUTED)
+    for w, h in zip(col_w, headers):
+        pdf.cell(w, 8, h, fill=True)
+    pdf.ln(8)
+
+    pdf.set_font('Helvetica', '', 9)
+    pdf.set_draw_color(*LINE)
+    for name, period, amount, status, paid_on in rows:
+        pdf.set_text_color(*INK)
+        pdf.cell(col_w[0], 8, name[:32], border='B')
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col_w[1], 8, period, border='B')
+        pdf.set_text_color(*INK)
+        pdf.cell(col_w[2], 8, amount, border='B')
+        if status == 'Paid':
+            pdf.set_text_color(5, 150, 105)
+        elif status == 'Overdue':
+            pdf.set_text_color(220, 38, 38)
+        else:
+            pdf.set_text_color(217, 119, 6)
+        pdf.cell(col_w[3], 8, status, border='B')
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col_w[4], 8, paid_on, border='B')
+        pdf.ln(8)
+
+    if not rows:
+        pdf.set_text_color(*MUTED)
+        pdf.cell(0, 10, 'No payment records for this month.', new_x='LMARGIN', new_y='NEXT')
+
+    pdf.ln(6)
+    pdf.set_font('Helvetica', 'I', 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(0, 6, f'Generated by TuitionPe on {datetime.now().strftime("%d %b %Y, %I:%M %p")}')
+
+    data = bytes(pdf.output())
+    return Response(data, mimetype='application/pdf', headers={
+        'Content-Disposition': f'attachment; filename="TuitionPe_Report_{month}.pdf"'
+    })

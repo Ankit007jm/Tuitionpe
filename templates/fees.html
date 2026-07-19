@@ -4,16 +4,22 @@
 {% block content %}
 <div class="app-container pt-6 pb-24 relative z-10">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 fade-in">
         <div>
             <p class="text-gray-500 text-sm">Fee Analytics</p>
             <h1 class="text-2xl font-bold mt-1">Payments</h1>
         </div>
-        <!-- Month Selector -->
-        <form method="GET" action="{{ url_for('fees.fees') }}" class="flex items-center">
-            <input type="month" name="month" value="{{ selected_month }}"
-                   class="input-dark rounded-xl py-2.5 px-3 text-sm text-white" onchange="this.form.submit()">
-        </form>
+        <!-- Month Selector + Report -->
+        <div class="flex items-center gap-2">
+            <form method="GET" action="{{ url_for('fees.fees') }}" class="flex items-center">
+                <input type="month" name="month" value="{{ selected_month }}"
+                       class="input-dark rounded-xl py-2.5 px-3 text-sm text-white" onchange="this.form.submit()">
+            </form>
+            <a href="{{ url_for('fees.monthly_report', month=selected_month) }}" data-no-fade
+               class="btn-outline px-3.5 py-2.5 rounded-xl text-sm font-semibold" title="Download PDF earnings report for {{ month_display }}">
+                <i class="fas fa-file-pdf"></i><span class="hidden sm:inline ml-1.5">Report</span>
+            </a>
+        </div>
     </div>
 
     <!-- Month Display -->
@@ -23,22 +29,22 @@
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-3 gap-3 mb-6">
-        <div class="card-dark rounded-2xl p-4 text-center">
-            <div class="w-10 h-10 gradient-accent rounded-xl flex items-center justify-center mx-auto mb-2">
+        <div class="card-dark rounded-2xl p-4 text-center transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10" style="animation: slideUp 0.4s ease both; animation-delay: 0.1s;">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style="background:var(--success-bg);color:var(--success);">
                 <i class="fas fa-check text-xs"></i>
             </div>
-            <div class="text-lg font-bold text-accent">₹<span class="count-up" data-target="{{ collected|int }}">{{ collected|int }}</span></div>
+            <div class="text-lg font-bold text-emerald-400">₹<span class="count-up" data-target="{{ collected|int }}">{{ collected|int }}</span></div>
             <div class="text-gray-500 text-xs">Collected</div>
         </div>
-        <div class="card-dark rounded-2xl p-4 text-center">
-            <div class="w-10 h-10 gradient-orange rounded-xl flex items-center justify-center mx-auto mb-2">
+        <div class="card-dark rounded-2xl p-4 text-center transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-orange-500/10" style="animation: slideUp 0.4s ease both; animation-delay: 0.2s;">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style="background:var(--warning-bg);color:var(--warning);">
                 <i class="fas fa-clock text-xs"></i>
             </div>
             <div class="text-lg font-bold text-orange-400">₹<span class="count-up" data-target="{{ pending|int }}">{{ pending|int }}</span></div>
             <div class="text-gray-500 text-xs">Pending</div>
         </div>
-        <div class="card-dark rounded-2xl p-4 text-center">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style="background:linear-gradient(135deg,#ef4444,#dc2626);">
+        <div class="card-dark rounded-2xl p-4 text-center transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-red-500/10" style="animation: slideUp 0.4s ease both; animation-delay: 0.3s;">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style="background:var(--danger-bg);color:var(--danger);">
                 <i class="fas fa-exclamation text-xs"></i>
             </div>
             <div class="text-lg font-bold text-red-400">₹<span class="count-up" data-target="{{ overdue|int }}">{{ overdue|int }}</span></div>
@@ -103,6 +109,9 @@
                 </div>
                 <div class="text-right">
                     <div class="font-bold text-sm">₹{{ p.amount|int }}</div>
+                    {% if item.is_prorata %}
+                    <div class="text-[10px] text-purple-400 font-medium">Pro-rata (₹{{ item.full_fee|int }})</div>
+                    {% endif %}
                     <span class="badge badge-{{ p.status }}">{{ p.status|capitalize }}</span>
                 </div>
             </div>
@@ -117,7 +126,7 @@
                 </form>
                 <a href="{{ url_for('fees.remind', student_id=s.id) }}" target="_blank"
                    class="py-2.5 rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1 transition-all hover:opacity-80"
-                   style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                   style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
                     <i class="fab fa-whatsapp"></i> Remind
                 </a>
             </div>
@@ -126,14 +135,14 @@
             <div class="grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
                 <a href="{{ url_for('fees.receipt_options', id=p.id) }}"
                    class="py-2.5 rounded-xl text-xs font-semibold text-center transition-all hover:opacity-80 flex items-center justify-center gap-1"
-                   style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                   style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
                     <i class="fas fa-receipt"></i> Send Receipt
                 </a>
                 <form method="POST" action="{{ url_for('fees.mark_unpaid', id=p.id) }}"
                       onsubmit="return confirm('Revert this payment to pending?');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="w-full py-2.5 rounded-xl text-xs font-semibold text-center transition-all hover:opacity-80"
-                            style="background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.25);">
+                            style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger);">
                         <i class="fas fa-undo mr-1"></i> Undo
                     </button>
                 </form>

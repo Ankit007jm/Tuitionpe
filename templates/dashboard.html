@@ -3,82 +3,285 @@
 
 {% block content %}
 <div class="app-container pt-6 pb-24 relative z-10">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <!-- Header with greeting -->
+    <div class="flex items-center justify-between mb-8 fade-in">
         <div>
-            <p class="text-gray-500 text-sm">Dashboard</p>
-            <h1 class="text-2xl font-bold mt-1">Hello, {{ current_user.name.split()[0] }}</h1>
+            <p class="section-label">Welcome back</p>
+            <h1 class="page-title mt-1">
+                Hello, <span class="text-gradient-accent">{{ current_user.name.split()[0] }}</span>
+            </h1>
+        </div>
+        <div class="w-11 h-11 gradient-accent rounded-xl flex items-center justify-center text-sm font-bold avatar">
+            {{ current_user.name.split()[0][0]|upper }}{{ current_user.name.split()[1][0]|upper if current_user.name.split()|length > 1 else '' }}
         </div>
     </div>
 
-    <!-- Stats Grid — 2 cols mobile, 4 cols desktop -->
+    <!-- New demo requests banner -->
+    {% if new_demo_requests %}
+    <a href="{{ url_for('booking.bookings') }}"
+       class="card-dark rounded-2xl p-3.5 flex items-center gap-3 mb-5 block" style="border-left: 3px solid var(--warning); animation: slideUp 0.4s ease both;">
+        <div class="w-9 h-9 rounded-xl icon-chip gradient-orange flex-shrink-0">
+            <i class="fas fa-bullhorn text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold">{{ new_demo_requests }} new demo request{{ 's' if new_demo_requests > 1 else '' }}</p>
+            <p class="text-gray-500 text-xs">Parents are waiting to hear from you</p>
+        </div>
+        <i class="fas fa-chevron-right text-gray-600 text-xs flex-shrink-0"></i>
+    </a>
+    {% endif %}
+
+    <!-- Stats Grid — clickable cards -->
     <div class="grid grid-cols-2 gap-3 mb-6 stats-grid-desktop">
-        <div class="card-dark rounded-2xl p-4">
-            <div class="w-10 h-10 gradient-blue rounded-xl flex items-center justify-center mb-3">
-                <i class="fas fa-user-graduate text-sm"></i>
+        <!-- Active Students Card -->
+        <div class="stat-card card-dark rounded-2xl p-4 cursor-pointer active:scale-[0.98]"
+             onclick="toggleCardDetail('activeStudents')" style="animation: slideUp 0.4s ease both; animation-delay: 0.05s;">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl icon-chip gradient-blue">
+                    <i class="fas fa-user-graduate text-sm"></i>
+                </div>
+                <i class="fas fa-chevron-down text-gray-600 text-[10px] card-chevron transition-transform" id="activeStudentsChevron"></i>
             </div>
             <div class="text-2xl font-bold count-up" data-target="{{ stats.active_students }}">{{ stats.active_students }}</div>
-            <div class="text-gray-500 text-xs">Active Students</div>
+            <div class="text-gray-500 text-xs font-medium">Active Students</div>
         </div>
-        <div class="card-dark rounded-2xl p-4">
-            <div class="w-10 h-10 gradient-purple rounded-xl flex items-center justify-center mb-3">
-                <i class="fas fa-chalkboard-teacher text-sm"></i>
+
+        <!-- Classes Today Card -->
+        <div class="stat-card card-dark rounded-2xl p-4 cursor-pointer active:scale-[0.98]"
+             onclick="toggleCardDetail('todayClasses')" style="animation: slideUp 0.4s ease both; animation-delay: 0.1s;">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl icon-chip gradient-purple">
+                    <i class="fas fa-chalkboard-teacher text-sm"></i>
+                </div>
+                <i class="fas fa-chevron-down text-gray-600 text-[10px] card-chevron transition-transform" id="todayClassesChevron"></i>
             </div>
             <div class="text-2xl font-bold count-up" data-target="{{ stats.today_classes }}">{{ stats.today_classes }}</div>
-            <div class="text-gray-500 text-xs">Classes Today</div>
+            <div class="text-gray-500 text-xs font-medium">Classes Today</div>
         </div>
-        <div class="card-dark rounded-2xl p-4">
-            <div class="w-10 h-10 gradient-orange rounded-xl flex items-center justify-center mb-3">
-                <i class="fas fa-exclamation-triangle text-sm"></i>
+
+        <!-- Pending Fees Card -->
+        <div class="stat-card card-dark rounded-2xl p-4 cursor-pointer active:scale-[0.98]"
+             onclick="toggleCardDetail('pendingFees')" style="animation: slideUp 0.4s ease both; animation-delay: 0.15s;">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl icon-chip gradient-orange">
+                    <i class="fas fa-hourglass-half text-sm"></i>
+                </div>
+                <i class="fas fa-chevron-down text-gray-600 text-[10px] card-chevron transition-transform" id="pendingFeesChevron"></i>
             </div>
             <div class="text-2xl font-bold">₹<span class="count-up" data-target="{{ stats.pending_fees|int }}">{{ stats.pending_fees|int }}</span></div>
-            <div class="text-gray-500 text-xs">Pending Fees</div>
+            <div class="text-gray-500 text-xs font-medium">Pending Fees</div>
         </div>
-        <div class="card-dark rounded-2xl p-4">
-            <div class="w-10 h-10 gradient-accent rounded-xl flex items-center justify-center mb-3">
-                <i class="fas fa-check-circle text-sm"></i>
+
+        <!-- Collected Card -->
+        <div class="stat-card card-dark rounded-2xl p-4 cursor-pointer active:scale-[0.98]"
+             onclick="toggleCardDetail('collectedFees')" style="animation: slideUp 0.4s ease both; animation-delay: 0.2s;">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl icon-chip gradient-green">
+                    <i class="fas fa-check-circle text-sm"></i>
+                </div>
+                <i class="fas fa-chevron-down text-gray-600 text-[10px] card-chevron transition-transform" id="collectedFeesChevron"></i>
             </div>
             <div class="text-2xl font-bold">₹<span class="count-up" data-target="{{ stats.collected_fees|int }}">{{ stats.collected_fees|int }}</span></div>
-            <div class="text-gray-500 text-xs">Collected</div>
+            <div class="text-gray-500 text-xs font-medium">Collected</div>
+        </div>
+    </div>
+
+    <!-- ═══ Card Detail Panels (hidden by default) ═══ -->
+
+    <!-- Active Students Detail -->
+    <div id="activeStudentsDetail" class="card-detail-panel hidden mb-6" style="animation: slideDown 0.3s ease both;">
+        <div class="card-dark rounded-2xl p-4 border-l-4" style="border-left-color: var(--info);">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-sm text-blue-400"><i class="fas fa-user-graduate mr-1.5"></i> Active Students</h3>
+                <a href="{{ url_for('students.student_list') }}" class="text-xs text-accent hover:underline">View All</a>
+            </div>
+            {% if active_students_detail %}
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                {% for s in active_students_detail %}
+                <div class="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02]">
+                    {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange'] %}
+                    <div class="w-8 h-8 {{ gradients[loop.index0 % 5] }} rounded-lg flex items-center justify-center text-[10px] font-bold avatar">{{ s.initials }}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium truncate">{{ s.name }}</div>
+                        <div class="text-gray-600 text-[10px]">{{ s.subject }} &bull; Class {{ s.class_grade }}</div>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-gray-400">{{ s.payment_cycle|capitalize }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p class="text-gray-500 text-xs italic">"{{ quotes.active_students }}"</p>
+                <a href="{{ url_for('students.add_student') }}" class="text-accent text-xs font-medium mt-2 inline-block hover:underline">+ Add your first student</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Today's Classes Detail -->
+    <div id="todayClassesDetail" class="card-detail-panel hidden mb-6" style="animation: slideDown 0.3s ease both;">
+        <div class="card-dark rounded-2xl p-4 border-l-4" style="border-left-color: var(--violet);">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-sm text-purple-400"><i class="fas fa-chalkboard-teacher mr-1.5"></i> Today's Schedule</h3>
+                <a href="{{ url_for('schedule.schedule') }}" class="text-xs text-accent hover:underline">View Schedule</a>
+            </div>
+            {% if today_classes %}
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                {% for cls in today_classes %}
+                <div class="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] {{ 'opacity-50' if cls.is_past and not cls.attendance else '' }}">
+                    <div class="text-emerald-500 font-bold text-xs min-w-[44px]">{{ cls.start_time|format_time_12hr }}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium truncate">{{ cls.student_name }}</div>
+                        <div class="text-gray-600 text-[10px]">{{ cls.subject }} &bull; {{ cls.class_type|capitalize }}</div>
+                    </div>
+                    {% if cls.attendance %}
+                    <span class="text-[10px] px-2 py-0.5 rounded-full
+                        {% if cls.attendance == 'completed' %}bg-emerald-500/10 text-emerald-400
+                        {% elif cls.attendance == 'absent' %}bg-red-500/10 text-red-400
+                        {% else %}bg-gray-500/10 text-gray-400{% endif %}">
+                        {{ cls.attendance|capitalize }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-umbrella-beach text-2xl text-gray-700 mb-2"></i>
+                <p class="text-gray-500 text-xs italic">"{{ quotes.today_classes }}"</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pending Fees Detail -->
+    <div id="pendingFeesDetail" class="card-detail-panel hidden mb-6" style="animation: slideDown 0.3s ease both;">
+        <div class="card-dark rounded-2xl p-4 border-l-4" style="border-left-color: var(--warning);">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-sm text-orange-400"><i class="fas fa-exclamation-triangle mr-1.5"></i> Pending Payments</h3>
+                <a href="{{ url_for('fees.fees') }}" class="text-xs text-accent hover:underline">Manage Fees</a>
+            </div>
+            {% if pending_fees_detail %}
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                {% for p in pending_fees_detail %}
+                <div class="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02]">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium truncate">{{ p.student_name }}</div>
+                        <div class="text-gray-600 text-[10px]">Due: {{ p.due_date or 'Not set' }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm font-bold">₹{{ p.amount|int }}</div>
+                        <span class="badge badge-{{ p.status }} text-[10px]">{{ p.status|capitalize }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-trophy text-2xl text-emerald-700 mb-2"></i>
+                <p class="text-emerald-500 text-xs font-medium mb-1">All fees collected!</p>
+                <p class="text-gray-500 text-xs italic">"{{ quotes.pending_fees }}"</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Collected Fees Detail -->
+    <div id="collectedFeesDetail" class="card-detail-panel hidden mb-6" style="animation: slideDown 0.3s ease both;">
+        <div class="card-dark rounded-2xl p-4 border-l-4" style="border-left-color: var(--success);">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-sm text-emerald-400"><i class="fas fa-check-circle mr-1.5"></i> Collected This Month</h3>
+                <a href="{{ url_for('fees.fees') }}" class="text-xs text-accent hover:underline">View All</a>
+            </div>
+            {% if collected_fees_detail %}
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                {% for p in collected_fees_detail %}
+                <div class="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02]">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                        <i class="fas fa-check text-emerald-500 text-[8px]"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium truncate">{{ p.student_name }}</div>
+                        <div class="text-gray-600 text-[10px]">Paid on {{ p.paid_date }}</div>
+                    </div>
+                    <div class="text-emerald-400 font-bold text-sm">₹{{ p.amount|int }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p class="text-gray-500 text-xs italic">"{{ quotes.collected_fees }}"</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 
     <!-- Chart + Progress — side by side on desktop -->
     <div class="two-col-desktop mb-6" style="gap:16px;">
         <!-- Payment Chart -->
-        <div class="card-dark rounded-2xl p-4 mb-4 lg:mb-0">
-            <h3 class="font-semibold text-sm mb-3">Payment Trends</h3>
+        <div class="card-dark rounded-2xl p-4 mb-4 lg:mb-0" style="animation: slideUp 0.5s ease both; animation-delay: 0.5s;">
+            <h3 class="font-semibold text-sm mb-3 flex items-center gap-2">
+                <i class="fas fa-chart-line text-accent text-xs"></i> Payment Trends
+            </h3>
             <div class="chart-container">
                 <canvas id="paymentChart"></canvas>
             </div>
         </div>
 
-        <!-- Monthly Progress -->
-        <div class="card-dark rounded-2xl p-4 mb-4 lg:mb-0 flex flex-col justify-center">
+        <!-- Monthly Progress + Payment History -->
+        <div class="card-dark rounded-2xl p-4 mb-4 lg:mb-0" style="animation: slideUp 0.5s ease both; animation-delay: 0.6s;">
             <div class="flex justify-between items-center mb-2">
-                <h3 class="font-semibold text-sm">Monthly Collection</h3>
-                <span class="text-accent text-sm font-bold">{{ progress }}%</span>
+                <h3 class="font-semibold text-sm flex items-center gap-2">
+                    <i class="fas fa-bullseye text-accent text-xs"></i> Monthly Collection
+                </h3>
+                <span class="text-sm font-bold text-gradient-accent">{{ progress }}%</span>
             </div>
-            <div class="w-full bg-white/5 rounded-full h-3 overflow-hidden">
+            <div class="w-full rounded-full h-3 overflow-hidden mb-2 progress-track">
                 <div class="progress-bar rounded-full" style="width: {{ progress }}%"></div>
             </div>
-            <div class="flex justify-between mt-2 text-xs text-gray-500">
+            <div class="flex justify-between mb-4 text-xs text-gray-500">
                 <span>₹{{ stats.collected_fees|int }} collected</span>
                 <span>₹{{ (stats.collected_fees + stats.pending_fees)|int }} total</span>
+            </div>
+
+            <!-- Recent Payment History -->
+            <div class="border-t border-white/5 pt-3">
+                <h4 class="text-xs font-semibold text-gray-400 mb-2">
+                    <i class="fas fa-history mr-1"></i> Recent Payments
+                </h4>
+                {% if recent_payments %}
+                <div class="space-y-1.5 max-h-40 overflow-y-auto">
+                    {% for rp in recent_payments %}
+                    <div class="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-white/[0.02] text-xs">
+                        <div class="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-rupee-sign text-emerald-500 text-[8px]"></i>
+                        </div>
+                        <div class="flex-1 min-w-0 truncate text-gray-300">{{ rp.student_name }}</div>
+                        <span class="text-emerald-400 font-semibold">₹{{ rp.amount|int }}</span>
+                        <span class="text-gray-600 text-[10px]">{{ rp.paid_date }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-600 text-xs text-center py-2 italic">"{{ quotes.collected_fees }}"</p>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <!-- Today's Classes -->
-    <div class="mb-6">
+    <div class="mb-6" style="animation: slideUp 0.5s ease both; animation-delay: 0.7s;">
         <div class="flex justify-between items-center mb-3">
-            <h3 class="font-semibold text-sm">Today's Classes</h3>
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i class="fas fa-calendar-day text-accent text-xs"></i> Today's Classes
+            </h3>
             <a href="{{ url_for('schedule.schedule') }}" class="text-accent text-xs font-medium hover:underline">View All</a>
         </div>
         {% if today_classes %}
         <div class="space-y-3">
             {% for cls in today_classes %}
-            <div class="card-dark rounded-2xl p-4 {{ 'opacity-50' if cls.is_past and not cls.attendance else '' }}">
+            <div class="card-dark rounded-2xl p-4 {{ 'opacity-50' if cls.is_past and not cls.attendance else '' }} transition-all hover:border-white/10"
+                 style="animation: slideUp 0.4s ease both; animation-delay: {{ 0.8 + loop.index0 * 0.1 }}s;">
                 <div class="flex items-center gap-3">
                     {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange'] %}
                     <div class="w-10 h-10 {{ gradients[loop.index0 % 5] }} rounded-xl flex items-center justify-center avatar text-sm font-bold">
@@ -86,10 +289,10 @@
                     </div>
                     <div class="flex-1">
                         <div class="font-medium text-sm">{{ cls.student_name }}</div>
-                        <div class="text-gray-500 text-xs">{{ cls.subject }} - {{ cls.class_type }}</div>
+                        <div class="text-gray-500 text-xs">{{ cls.subject }} &bull; {{ cls.class_type|capitalize }}</div>
                     </div>
                     <div class="text-right">
-                        <div class="text-sm font-medium">{{ cls.start_time }}</div>
+                        <div class="text-sm font-medium text-emerald-400">{{ cls.start_time|format_time_12hr }}</div>
                         {% if cls.attendance %}
                         <span class="text-xs font-medium px-2 py-0.5 rounded-full
                             {% if cls.attendance == 'completed' %}bg-emerald-500/10 text-emerald-500
@@ -109,27 +312,33 @@
         </div>
         {% else %}
         <div class="card-dark rounded-2xl p-6 text-center">
-            <i class="fas fa-calendar-check text-2xl text-gray-600 mb-2"></i>
-            <p class="text-gray-500 text-sm">No classes scheduled for today</p>
+            <i class="fas fa-coffee text-2xl text-gray-600 mb-2"></i>
+            <p class="text-gray-400 text-sm font-medium mb-1">No classes today</p>
+            <p class="text-gray-600 text-xs italic">"{{ quotes.today_classes }}"</p>
         </div>
         {% endif %}
     </div>
 
     <!-- Quick Actions -->
-    <div class="flex gap-3 mb-4">
+    <div class="flex gap-3 mb-4" style="animation: slideUp 0.5s ease both; animation-delay: 0.9s;">
         <a href="{{ url_for('students.add_student') }}" class="flex-1 btn-primary py-3 rounded-xl font-semibold text-sm text-center">
             <i class="fas fa-plus mr-1"></i> Add Student
         </a>
+        <a href="{{ url_for('schedule.attendance_tracker') }}" class="flex-1 btn-outline py-3 rounded-xl font-semibold text-sm text-center">
+            <i class="fas fa-clipboard-check mr-1"></i> Attendance
+        </a>
         <a href="{{ url_for('fees.fees') }}" class="flex-1 btn-outline py-3 rounded-xl font-semibold text-sm text-center">
-            <i class="fas fa-rupee-sign mr-1"></i> View Fees
+            <i class="fas fa-rupee-sign mr-1"></i> Fees
         </a>
     </div>
+
     <!-- Self-Reminder shortcut -->
     {% if current_user.email %}
     <a href="{{ url_for('profile.send_today_email') }}"
-       class="w-full card-dark rounded-2xl p-3.5 flex items-center gap-3 hover:border-emerald-500/30 mb-6 block">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(16,185,129,0.1);">
-            <i class="fas fa-envelope text-emerald-500 text-sm"></i>
+       class="w-full card-dark rounded-2xl p-3.5 flex items-center gap-3 mb-6 block"
+       style="animation: slideUp 0.5s ease both; animation-delay: 1.0s;">
+        <div class="w-9 h-9 rounded-xl icon-chip gradient-green flex-shrink-0">
+            <i class="fas fa-envelope text-sm"></i>
         </div>
         <div class="flex-1 min-w-0">
             <p class="text-sm font-medium">Email me today's schedule</p>
@@ -162,7 +371,37 @@ document.addEventListener('DOMContentLoaded', function() {
         const target = parseInt(el.dataset.target) || 0;
         animateCountUp(el, target, 1500);
     });
-
 });
+
+// Toggle card detail panels
+function toggleCardDetail(cardId) {
+    const panel = document.getElementById(cardId + 'Detail');
+    const chevron = document.getElementById(cardId + 'Chevron');
+    if (!panel) return;
+
+    // Close all other panels
+    document.querySelectorAll('.card-detail-panel').forEach(p => {
+        if (p.id !== cardId + 'Detail') {
+            p.classList.add('hidden');
+        }
+    });
+    document.querySelectorAll('.card-chevron').forEach(c => {
+        if (c.id !== cardId + 'Chevron') {
+            c.style.transform = 'rotate(0deg)';
+        }
+    });
+
+    // Toggle this panel
+    const isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    if (chevron) {
+        chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    // Scroll to panel if opening
+    if (isHidden) {
+        setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+}
 </script>
 {% endblock %}

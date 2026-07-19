@@ -1,4 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+import secrets
+import requests as http_requests
 
 from flask_login import login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -44,6 +46,55 @@ def _record_attempt(ip):
     """Record a failed login attempt."""
     with _rate_lock:
         _login_attempts[ip].append(datetime.now())
+
+
+# ── Server-side pending OTPs ─────────────────────────────────
+# The Flask session cookie is signed but CLIENT-READABLE, so the OTP must
+# never be stored in it (whoever triggers the reset holds that cookie).
+# Hashes live in the database with expiry and an attempt cap — DB-backed so
+# the flow also works on serverless hosts where process memory doesn't persist.
+import hashlib
+from models import PasswordReset
+
+MAX_OTP_ATTEMPTS = 5
+
+
+def _store_otp(tutor_id, otp):
+    rec = db.session.get(PasswordReset, tutor_id)
+    if not rec:
+        rec = PasswordReset(tutor_id=tutor_id, otp_hash='', expires_at=datetime.utcnow())
+        db.session.add(rec)
+    rec.otp_hash = hashlib.sha256(otp.encode()).hexdigest()
+    rec.expires_at = datetime.utcnow() + timedelta(minutes=10)
+    rec.attempts = 0
+    db.session.commit()
+
+
+def _clear_otp(tutor_id):
+    rec = db.session.get(PasswordReset, tutor_id)
+    if rec:
+        db.session.delete(rec)
+        db.session.commit()
+
+
+def _check_otp(tutor_id, entered):
+    """Returns 'ok' | 'bad' | 'expired' | 'locked' | 'missing'."""
+    rec = db.session.get(PasswordReset, tutor_id)
+    if not rec:
+        return 'missing'
+    if datetime.utcnow() > rec.expires_at:
+        _clear_otp(tutor_id)
+        return 'expired'
+    rec.attempts += 1
+    db.session.commit()
+    if rec.attempts > MAX_OTP_ATTEMPTS:
+        _clear_otp(tutor_id)
+        return 'locked'
+    entered_hash = hashlib.sha256(entered.encode()).hexdigest()
+    if secrets.compare_digest(entered_hash, rec.otp_hash):
+        _clear_otp(tutor_id)
+        return 'ok'
+    return 'bad'
 
 
 def generate_otp():
@@ -128,11 +179,128 @@ def login():
         return redirect(url_for('auth.login'))
     return render_template('auth/login.html')
 
+# ─────────────────────────────────────────────
+# Legal pages
+# ─────────────────────────────────────────────
+@auth_bp.route('/terms')
+def terms():
+    return render_template('legal/terms.html')
+
+
+@auth_bp.route('/privacy')
+def privacy():
+    return render_template('legal/privacy.html')
+
+
+# ─────────────────────────────────────────────
+# Google OAuth 2.0 login
+# Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars.
+# Existing tutors are matched by email; new users are sent to
+# signup with name/email prefilled (phone + password still needed).
+# ─────────────────────────────────────────────
+GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
+GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
+
+
+def _google_creds():
+    return os.environ.get('GOOGLE_CLIENT_ID'), os.environ.get('GOOGLE_CLIENT_SECRET')
+
+
+@auth_bp.route('/login/google')
+def google_login():
+    client_id, client_secret = _google_creds()
+    if not client_id or not client_secret:
+        flash('Google login is not configured on this server yet. Please sign in with your phone number.', 'info')
+        return redirect(url_for('auth.login'))
+
+    state = secrets.token_urlsafe(24)
+    session['google_oauth_state'] = state
+    from urllib.parse import urlencode
+    params = urlencode({
+        'client_id': client_id,
+        'redirect_uri': url_for('auth.google_callback', _external=True),
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'prompt': 'select_account',
+    })
+    return redirect(f'{GOOGLE_AUTH_URL}?{params}')
+
+
+@auth_bp.route('/login/google/callback')
+def google_callback():
+    client_id, client_secret = _google_creds()
+    if not client_id or not client_secret:
+        return redirect(url_for('auth.login'))
+
+    # CSRF protection: state must match what we issued (timing-safe)
+    state = request.args.get('state', '')
+    expected_state = session.pop('google_oauth_state', None) or ''
+    if not state or not expected_state or not secrets.compare_digest(state, expected_state):
+        flash('Google sign-in session expired. Please try again.', 'error')
+        return redirect(url_for('auth.login'))
+
+    if request.args.get('error'):
+        flash('Google sign-in was cancelled.', 'info')
+        return redirect(url_for('auth.login'))
+
+    code = request.args.get('code')
+    if not code:
+        flash('Google sign-in failed. Please try again.', 'error')
+        return redirect(url_for('auth.login'))
+
+    try:
+        token_resp = http_requests.post(GOOGLE_TOKEN_URL, data={
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': url_for('auth.google_callback', _external=True),
+            'grant_type': 'authorization_code',
+        }, timeout=10)
+        token_resp.raise_for_status()
+        access_token = token_resp.json().get('access_token')
+
+        info_resp = http_requests.get(
+            GOOGLE_USERINFO_URL,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10,
+        )
+        info_resp.raise_for_status()
+        info = info_resp.json()
+    except Exception:
+        current_app.logger.exception('Google OAuth token/userinfo exchange failed')
+        flash('Could not reach Google. Please try again.', 'error')
+        return redirect(url_for('auth.login'))
+
+    email = (info.get('email') or '').strip().lower()
+    if not email or not info.get('email_verified', False):
+        flash('Your Google account has no verified email, so we cannot sign you in with it.', 'error')
+        return redirect(url_for('auth.login'))
+
+    tutor = Tutor.query.filter(db.func.lower(Tutor.email) == email).first()
+    if tutor:
+        login_user(tutor, remember=True)
+        flash(f'Welcome back, {tutor.name.split()[0]}!', 'success')
+        return redirect(url_for('dashboard.dashboard'))
+
+    # New user — hand off to signup with prefilled details
+    session['google_prefill'] = {'name': info.get('name', ''), 'email': email}
+    flash('Almost there! Complete your profile to finish creating your account.', 'info')
+    return redirect(url_for('auth.signup'))
+
+
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.dashboard'))
     if request.method == 'POST':
+        # Same per-IP throttle as login to keep bots from mass-creating accounts
+        client_ip = request.remote_addr or '0.0.0.0'
+        if _is_rate_limited(client_ip):
+            flash('Too many attempts. Please wait a few minutes and try again.', 'error')
+            return redirect(url_for('auth.signup'))
+
         name = request.form.get('name', '').strip()
         phone = request.form.get('phone', '').strip()
         email = request.form.get('email', '').strip()
@@ -200,10 +368,17 @@ def signup():
         )
         db.session.add(tutor)
         db.session.commit()
+        # Count successful creations toward the IP throttle so a bot can't
+        # mass-register; failed validation attempts stay free for humans.
+        _record_attempt(client_ip)
         login_user(tutor)
+        session.pop('google_prefill', None)
         flash('Account created successfully! Welcome to TuitionPe.', 'success')
         return redirect(url_for('dashboard.dashboard'))
-    return render_template('auth/signup.html')
+    prefill = session.get('google_prefill') or {}
+    return render_template('auth/signup.html',
+                           prefill_name=prefill.get('name', ''),
+                           prefill_email=prefill.get('email', ''))
 
 @auth_bp.route('/logout')
 def logout():
@@ -252,11 +427,10 @@ def forgot_password():
         result = send_otp_email(tutor.email, otp, tutor.name)
 
         if result is True:
-            # Store OTP in session
-            session['reset_otp'] = otp
+            # OTP hash lives server-side only; session just tracks who is resetting
+            _store_otp(tutor.id, otp)
             session['reset_phone'] = phone
             session['reset_tutor_id'] = tutor.id
-            session['reset_otp_expiry'] = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
             flash('OTP sent to your email! Check your inbox.', 'success')
             return redirect(url_for('auth.verify_otp'))
         else:
@@ -273,31 +447,29 @@ def verify_otp():
         return redirect(url_for('dashboard.dashboard'))
 
     # Must have a pending reset
-    if 'reset_otp' not in session:
+    if 'reset_tutor_id' not in session:
         flash('Please start the password reset process first.', 'error')
         return redirect(url_for('auth.forgot_password'))
 
     if request.method == 'POST':
         entered_otp = request.form.get('otp', '').strip()
+        result = _check_otp(session['reset_tutor_id'], entered_otp)
 
-        # Check expiry
-        expiry = datetime.fromisoformat(session.get('reset_otp_expiry', '2000-01-01'))
-        if datetime.utcnow() > expiry:
-            session.pop('reset_otp', None)
-            session.pop('reset_phone', None)
-            session.pop('reset_tutor_id', None)
-            session.pop('reset_otp_expiry', None)
-            flash('OTP has expired. Please request a new one.', 'error')
-            return redirect(url_for('auth.forgot_password'))
-
-        if entered_otp == session.get('reset_otp'):
-            # OTP verified — allow password reset
+        if result == 'ok':
             session['otp_verified'] = True
             flash('OTP verified! Set your new password.', 'success')
             return redirect(url_for('auth.reset_password'))
-        else:
+        if result == 'bad':
             flash('Invalid OTP. Please try again.', 'error')
             return redirect(url_for('auth.verify_otp'))
+        # expired / locked / missing — restart the flow
+        session.pop('reset_phone', None)
+        session.pop('reset_tutor_id', None)
+        if result == 'locked':
+            flash('Too many incorrect attempts. Please request a new OTP.', 'error')
+        else:
+            flash('OTP has expired. Please request a new one.', 'error')
+        return redirect(url_for('auth.forgot_password'))
 
     phone = session.get('reset_phone', '')
     return render_template('auth/verify_otp.html', phone=phone)
@@ -361,8 +533,7 @@ def resend_otp():
     result = send_otp_email(tutor.email, otp, tutor.name)
 
     if result is True:
-        session['reset_otp'] = otp
-        session['reset_otp_expiry'] = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+        _store_otp(tutor.id, otp)
         flash('New OTP sent to your email!', 'success')
     else:
         flash(result, 'error')

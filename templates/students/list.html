@@ -4,18 +4,18 @@
 {% block content %}
 <div class="app-container pt-6 pb-24 relative z-10">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 fade-in">
         <div>
             <p class="text-gray-500 text-sm">My Students</p>
             <h1 class="text-2xl font-bold mt-1">Students</h1>
         </div>
-        <a href="{{ url_for('students.add_student') }}" class="btn-primary px-4 py-2 rounded-xl text-sm font-semibold">
+        <a href="{{ url_for('students.add_student') }}" class="btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold">
             <i class="fas fa-plus mr-1"></i> Add
         </a>
     </div>
 
     <!-- Search -->
-    <div class="mb-4">
+    <div class="mb-4" style="animation: slideUp 0.4s ease both; animation-delay: 0.1s;">
         <div class="relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
             <input type="text" id="studentSearch" placeholder="Search students..." value="{{ search }}"
@@ -25,7 +25,7 @@
     </div>
 
     <!-- Filter Tabs - Pill Style -->
-    <div class="flex gap-2 mb-5 overflow-x-auto pb-2">
+    <div class="flex gap-2 mb-5 overflow-x-auto pb-2" style="animation: slideUp 0.4s ease both; animation-delay: 0.15s;">
         <a href="{{ url_for('students.student_list', filter='all') }}"
            class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all {{ 'btn-primary' if filter_type == 'all' and not show_archived else 'card-dark text-gray-400 hover:text-white hover:border-accent/30' }}">
             All ({{ total }})
@@ -47,7 +47,7 @@
     </div>
 
     {% if show_archived %}
-    <div class="card-dark rounded-xl p-3 mb-4 border border-yellow-500/20">
+    <div class="card-dark rounded-xl p-3 mb-4 border border-yellow-500/20" style="animation: slideDown 0.3s ease both;">
         <p class="text-yellow-400 text-xs"><i class="fas fa-info-circle mr-1"></i> Showing archived students. These students are inactive but their data is preserved.</p>
     </div>
     {% endif %}
@@ -58,7 +58,8 @@
         {% for item in student_data %}
         {% set s = item.student %}
         {% set status = item.fee_status %}
-        <div class="card-dark rounded-2xl p-4 {{ 'opacity-70' if show_archived else '' }}">
+        <div class="card-dark rounded-2xl p-4 {{ 'opacity-70' if show_archived else '' }} transition-all hover:border-white/10"
+             style="animation: slideUp 0.4s ease both; animation-delay: {{ 0.2 + loop.index0 * 0.05 }}s;">
             <div class="flex items-center gap-3 mb-3">
                 {% set gradients = ['gradient-blue', 'gradient-purple', 'gradient-pink', 'gradient-cyan', 'gradient-orange', 'gradient-green'] %}
                 <div class="w-11 h-11 {{ gradients[loop.index0 % 6] }} rounded-xl flex items-center justify-center avatar text-sm font-bold">
@@ -66,7 +67,7 @@
                 </div>
                 <div class="flex-1">
                     <div class="font-medium">{{ s.student_name }}</div>
-                    <div class="text-gray-500 text-xs">Class {{ s.class_grade }} - {{ s.subject }}</div>
+                    <div class="text-gray-500 text-xs">Class {{ s.class_grade }} &bull; {{ s.subject }}</div>
                 </div>
                 {% if not show_archived %}
                 <span class="badge badge-{{ status }}">
@@ -76,19 +77,29 @@
             </div>
             <div class="flex items-center justify-between pt-3 border-t border-white/5">
                 <div class="text-sm">
-                    <span class="text-accent font-semibold">₹{{ s.fee_amount|int }}</span>
+                    <span class="font-semibold" style="background:linear-gradient(120deg,var(--accent-dark),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">₹{{ s.fee_amount|int }}</span>
                     <span class="text-gray-500">/{{ s.payment_cycle }}</span>
+                    {% if item.att_pct is not none %}
+                    {% set att_color = 'var(--success)' if item.att_pct >= 90 else ('var(--warning)' if item.att_pct >= 75 else 'var(--danger)') %}
+                    {% set att_bg = 'var(--success-bg)' if item.att_pct >= 90 else ('var(--warning-bg)' if item.att_pct >= 75 else 'var(--danger-bg)') %}
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-2"
+                          style="background:{{ att_bg }};color:{{ att_color }};"
+                          title="Attendance: classes attended vs held">
+                        <i class="fas fa-clipboard-check mr-0.5"></i>{{ item.att_pct }}%
+                    </span>
+                    {% endif %}
+                    {% if s.date_of_joining %}
+                    <span class="text-gray-600 text-[10px] ml-2"><i class="fas fa-calendar-alt mr-0.5"></i>{{ s.date_of_joining.strftime('%d %b %Y') }}</span>
+                    {% endif %}
                 </div>
                 <div class="flex gap-2">
                     {% if show_archived %}
-                    <!-- Restore button for archived students -->
                     <form method="POST" action="{{ url_for('students.restore_student', id=s.id) }}" class="inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:rgba(16,185,129,0.15);" title="Restore Student">
-                            <i class="fas fa-undo text-xs" style="color:#10b981;"></i>
+                        <button type="submit" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:var(--success-bg);" title="Restore Student">
+                            <i class="fas fa-undo text-xs" style="color:var(--success);"></i>
                         </button>
                     </form>
-                    <!-- Permanent delete -->
                     <form method="POST" action="{{ url_for('students.permanently_delete_student', id=s.id) }}"
                           onsubmit="return confirm('PERMANENTLY delete {{ s.student_name }} and ALL their payment records, schedules, and attendance data? This cannot be undone.');" class="inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -103,8 +114,11 @@
                     <a href="{{ url_for('fees.payment_history', student_id=s.id) }}" class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-accent/30 transition-all" title="Payment History">
                         <i class="fas fa-history text-xs text-gray-400"></i>
                     </a>
-                    <a href="{{ url_for('fees.remind', student_id=s.id) }}" target="_blank" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:rgba(16,185,129,0.15);">
-                        <i class="fab fa-whatsapp text-sm" style="color:#10b981;"></i>
+                    <a href="{{ url_for('students.progress_report', id=s.id) }}" data-no-fade class="w-8 h-8 card-dark rounded-lg flex items-center justify-center hover:border-accent/30 transition-all" title="Download Progress Report (PDF)">
+                        <i class="fas fa-chart-line text-xs text-gray-400"></i>
+                    </a>
+                    <a href="{{ url_for('fees.remind', student_id=s.id) }}" target="_blank" class="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80 transition-all" style="background:var(--success-bg);">
+                        <i class="fab fa-whatsapp text-sm" style="color:var(--success);"></i>
                     </a>
                     <form method="POST" action="{{ url_for('students.delete_student', id=s.id) }}"
                           onsubmit="return confirm('Archive {{ s.student_name }}? They will be moved to the archived list.');" class="inline">
@@ -120,7 +134,7 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="card-dark rounded-2xl p-8 text-center">
+    <div class="card-dark rounded-2xl p-8 text-center" style="animation: slideUp 0.4s ease both; animation-delay: 0.2s;">
         <i class="fas fa-user-graduate text-3xl text-gray-600 mb-3"></i>
         {% if show_archived %}
         <p class="text-gray-400 font-medium mb-1">No archived students</p>

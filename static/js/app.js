@@ -142,7 +142,7 @@ function updateSignupStepIndicators() {
         }
 
         if (label) {
-            label.style.color = i <= currentSignupStep ? '#10b981' : '#6b7280';
+            label.style.color = i <= currentSignupStep ? 'var(--accent-dark)' : 'var(--text-muted)';
         }
     }
 }
@@ -205,9 +205,23 @@ function toggleEdit(section) {
 }
 
 // ========== CHART INITIALIZATION ==========
+// Read design tokens so charts match the active theme
+function chartTheme() {
+    const s = getComputedStyle(document.documentElement);
+    const v = name => s.getPropertyValue(name).trim();
+    return {
+        accent: v('--accent') || '#0d9488',
+        warning: v('--warning') || '#d97706',
+        danger: v('--danger') || '#dc2626',
+        text: v('--text-muted') || '#7d8c88',
+        grid: v('--border-default') || '#e3eae8',
+    };
+}
+
 function initPaymentChart(labels, collected, pending) {
     const ctx = document.getElementById('paymentChart');
     if (!ctx) return;
+    const t = chartTheme();
     new Chart(ctx, {
         type: 'line',
         data: {
@@ -215,30 +229,32 @@ function initPaymentChart(labels, collected, pending) {
             datasets: [{
                 label: 'Collected',
                 data: collected,
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16,185,129,0.1)',
+                borderColor: t.accent,
+                backgroundColor: t.accent + '1a',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 4,
-                pointBackgroundColor: '#10b981',
+                pointRadius: 3,
+                pointBackgroundColor: t.accent,
+                borderWidth: 2,
             }, {
                 label: 'Pending',
                 data: pending,
-                borderColor: '#f97316',
-                backgroundColor: 'rgba(249,115,22,0.1)',
+                borderColor: t.warning,
+                backgroundColor: t.warning + '1a',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 4,
-                pointBackgroundColor: '#f97316',
+                pointRadius: 3,
+                pointBackgroundColor: t.warning,
+                borderWidth: 2,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 11 } } } },
+            plugins: { legend: { display: true, labels: { color: t.text, font: { size: 11, weight: 600 }, boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } } },
             scales: {
-                x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
-                y: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => '₹' + v }, grid: { color: 'rgba(255,255,255,0.03)' } }
+                x: { ticks: { color: t.text, font: { size: 10 } }, grid: { display: false } },
+                y: { ticks: { color: t.text, font: { size: 10 }, callback: v => '₹' + v }, grid: { color: t.grid }, border: { display: false } }
             }
         }
     });
@@ -247,22 +263,25 @@ function initPaymentChart(labels, collected, pending) {
 function initFeesPieChart(collected, pending, overdue) {
     const ctx = document.getElementById('feesPieChart');
     if (!ctx) return;
+    const t = chartTheme();
     new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Collected', 'Pending', 'Overdue'],
             datasets: [{
                 data: [collected, pending, overdue],
-                backgroundColor: ['#10b981', '#f97316', '#ef4444'],
+                backgroundColor: [t.accent, t.warning, t.danger],
                 borderWidth: 0,
+                borderRadius: 4,
+                spacing: 2,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '65%',
+            cutout: '68%',
             plugins: {
-                legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', padding: 16, font: { size: 11 } } }
+                legend: { display: true, position: 'bottom', labels: { color: t.text, padding: 16, font: { size: 11, weight: 600 }, boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } }
             }
         }
     });
@@ -288,4 +307,119 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => f.remove(), 300);
         }, 4000);
     });
+});
+
+// ========== MILKINSIDE-STYLE ANIMATIONS ==========
+
+// 1. Custom cursor — disabled (default cursor restored)
+
+// 2. Scroll-triggered reveal via IntersectionObserver
+function initScrollReveal() {
+    const SKIP = '.sidebar, .bottom-nav, .loading-screen, .toast, .modal-overlay, [data-sr-skip]';
+
+    // Auto-tag revelable elements that aren't already tagged
+    const targets = document.querySelectorAll('.card-dark, .stat-card, .flash-message');
+    targets.forEach((el, i) => {
+        if (el.closest(SKIP) || el.hasAttribute('data-sr')) return;
+        el.setAttribute('data-sr', '');
+        // Stagger within siblings — use index mod 6 for variety
+        el.style.transitionDelay = (i % 6) * 0.07 + 's';
+    });
+
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('sr-in');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
+
+    document.querySelectorAll('[data-sr]').forEach(el => {
+        if (!el.closest(SKIP)) observer.observe(el);
+    });
+}
+
+// 3. Text mask reveal — word-by-word slide-up for h1 elements
+function initTextReveal() {
+    document.querySelectorAll('h1').forEach(el => {
+        // Skip if already processed or contains child elements with structure
+        if (el.dataset.trDone || el.querySelector('span, a, i')) return;
+        el.dataset.trDone = '1';
+
+        const text = el.textContent.trim();
+        if (!text) return;
+        const words = text.split(/\s+/);
+        el.innerHTML = words.map((w, i) =>
+            `<span class="reveal-clip" style="margin-right:0.25em"><span class="reveal-clip-inner" style="--reveal-delay:${i * 0.08}s">${w}</span></span>`
+        ).join('');
+
+        requestAnimationFrame(() => setTimeout(() => {
+            el.querySelectorAll('.reveal-clip-inner').forEach(s => s.classList.add('revealed'));
+        }, 120));
+    });
+}
+
+// 4. Soft page fade transition — gentle opacity fade, no overlay
+function initPageTransition() {
+    // Entrance: ensure page starts at full opacity (in case browser cached an exit state)
+    document.body.style.opacity = '';
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let navigating = false;
+    document.addEventListener('click', e => {
+        if (navigating) return;
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('http') ||
+            link.target === '_blank' || href.startsWith('mailto') ||
+            href.startsWith('tel') || href.startsWith('whatsapp')) return;
+        if (link.dataset.noFade !== undefined) return;
+
+        e.preventDefault();
+        navigating = true;
+        document.body.style.transition = 'opacity 0.18s ease';
+        document.body.style.opacity = '0';
+        setTimeout(() => { window.location.href = href; }, 180);
+    });
+}
+
+// 5. Click ripple on buttons
+function initRipples() {
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.btn-primary, .btn-outline');
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        const d = Math.max(r.width, r.height);
+        const s = document.createElement('span');
+        s.className = 'ripple';
+        s.style.width = s.style.height = d + 'px';
+        s.style.left = (e.clientX - r.left - d / 2) + 'px';
+        s.style.top = (e.clientY - r.top - d / 2) + 'px';
+        btn.appendChild(s);
+        setTimeout(() => s.remove(), 600);
+    });
+}
+
+// 6. Animate progress bars from 0 to their target width on load
+function initProgressBars() {
+    document.querySelectorAll('.progress-bar').forEach(bar => {
+        const target = bar.style.width;
+        if (!target) return;
+        bar.style.width = '0%';
+        requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = target; }));
+    });
+}
+
+// Boot all animations
+document.addEventListener('DOMContentLoaded', () => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduced) {
+        initScrollReveal();
+        initTextReveal();
+        initRipples();
+        initProgressBars();
+    }
+    initPageTransition();
 });

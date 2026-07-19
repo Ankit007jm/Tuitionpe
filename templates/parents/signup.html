@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Parent Sign Up{% endblock %}
+
+{% block content %}
+{% set parent = None %}
+{% include "components/parent_nav.html" %}
+
+<div class="flex items-center justify-center px-4 py-10 grid-bg relative z-10">
+    <div class="w-full auth-container mx-auto">
+        <div class="text-center mb-7">
+            <h1 class="text-3xl font-extrabold tracking-tight">Find a teacher, <span class="text-gradient-accent">fast</span></h1>
+            <p class="text-gray-500 text-sm mt-2">One free account. Book demo classes in a tap.</p>
+        </div>
+
+        <div class="card-dark rounded-3xl p-7">
+            <form method="POST" action="{{ url_for('parents.parent_signup') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="next" value="{{ next }}">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Your Name *</label>
+                        <input type="text" name="name" required maxlength="100" placeholder="Parent or student name" class="input-dark rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Phone Number *</label>
+                        <div class="flex phone-group">
+                            <span class="phone-prefix">+91</span>
+                            <input type="tel" name="phone" placeholder="10-digit number" class="phone-input" maxlength="10" pattern="[0-9]{10}" required>
+                        </div>
+                        <p class="text-gray-600 text-xs mt-1.5"><i class="fas fa-info-circle mr-1"></i>Used for login and for teachers to reach you</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">Password *</label>
+                        <input type="password" name="password" minlength="6" required placeholder="Min 6 characters" class="input-dark rounded-xl">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Student Name</label>
+                            <input type="text" name="child_name" maxlength="100" placeholder="Your child" class="input-dark rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2 font-medium">Class</label>
+                            <input type="text" name="child_class" maxlength="20" placeholder="e.g. 10" class="input-dark rounded-xl">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2 font-medium">City</label>
+                        <input type="text" name="city" maxlength="100" placeholder="e.g. Patna" class="input-dark rounded-xl">
+                    </div>
+                </div>
+                <button type="submit" class="w-full btn-primary py-4 rounded-xl font-semibold mt-6">
+                    Create free account <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+            <p class="text-center mt-5 text-gray-500 text-sm">
+                Already have an account? <a href="{{ url_for('parents.parent_login', next=next) }}" class="text-accent font-medium hover:underline">Log in</a>
+            </p>
+        </div>
+
+        <p class="text-center text-gray-600 text-xs mt-6">
+            By signing up, you agree to our
+            <a href="{{ url_for('auth.terms') }}" class="text-gray-400 hover:text-accent">Terms</a> &
+            <a href="{{ url_for('auth.privacy') }}" class="text-gray-400 hover:text-accent">Privacy Policy</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

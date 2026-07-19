@@ -22,6 +22,10 @@ class Tutor(UserMixin, db.Model):
     bank_account = db.Column(db.String(50))
     ifsc_code = db.Column(db.String(20))
     pay_token = db.Column(db.String(32))                       # Random token for public payment page URLs
+    booking_token = db.Column(db.String(32))                   # Random token for public demo-booking page URL
+    discoverable = db.Column(db.Boolean, default=False)        # Opt-in: listed in parent-facing teacher search
+    city = db.Column(db.String(100))                           # For discovery filtering
+    teaching_mode = db.Column(db.String(20), default='both')   # online / offline / both
     daily_reminder = db.Column(db.Boolean, default=True)      # Enable daily email reminder
     reminder_hour = db.Column(db.Integer, default=7)           # Morning reminder hour (0-23)
     reminder_minute = db.Column(db.Integer, default=0)         # Morning reminder minute (0-59)
@@ -49,6 +53,7 @@ class Student(db.Model):
     notes = db.Column(db.Text)
     profile_image = db.Column(db.String(255))
     status = db.Column(db.String(20), default='active')   # active / archived
+    date_of_joining = db.Column(db.Date)                   # for pro-rata fee calculation
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     schedules = db.relationship('Schedule', backref='student', lazy=True, cascade='all, delete-orphan')
@@ -65,6 +70,7 @@ class Schedule(db.Model):
     end_time = db.Column(db.String(10))
     class_type = db.Column(db.String(20), default='offline')
     location = db.Column(db.String(255))
+    batch_name = db.Column(db.String(60))                  # group/batch classes share a name + slot
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -95,3 +101,58 @@ class Attendance(db.Model):
     status = db.Column(db.String(20), default='completed')  # completed / absent / cancelled
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Parent(db.Model):
+    """Parent/student account for the teacher-discovery marketplace."""
+    __tablename__ = 'parents'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(15), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    child_name = db.Column(db.String(100))
+    child_class = db.Column(db.String(20))
+    city = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    demo_requests = db.relationship('DemoRequest', backref='parent', lazy=True)
+
+
+class DemoRequest(db.Model):
+    """Demo class requests submitted by parents via the tutor's public booking link."""
+    __tablename__ = 'demo_requests'
+    id = db.Column(db.Integer, primary_key=True)
+    tutor_id = db.Column(db.Integer, db.ForeignKey('tutors.id', ondelete='CASCADE'), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('parents.id', ondelete='SET NULL'), nullable=True)
+    student_name = db.Column(db.String(100), nullable=False)
+    parent_name = db.Column(db.String(100))
+    phone = db.Column(db.String(15), nullable=False)
+    class_grade = db.Column(db.String(20))
+    subject = db.Column(db.String(100))
+    preferred_day = db.Column(db.String(15))
+    preferred_time = db.Column(db.String(20))
+    note = db.Column(db.Text)
+    status = db.Column(db.String(20), default='new')  # new / contacted / closed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Review(db.Model):
+    """Parent rating for a tutor after a demo request was acted on."""
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    tutor_id = db.Column(db.Integer, db.ForeignKey('tutors.id', ondelete='CASCADE'), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('parents.id', ondelete='CASCADE'), nullable=False)
+    demo_request_id = db.Column(db.Integer, db.ForeignKey('demo_requests.id', ondelete='CASCADE'),
+                                nullable=False, unique=True)
+    rating = db.Column(db.Integer, nullable=False)  # 1-5
+    comment = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PasswordReset(db.Model):
+    """Server-side OTP store for password resets (survives serverless invocations)."""
+    __tablename__ = 'password_resets'
+    tutor_id = db.Column(db.Integer, db.ForeignKey('tutors.id', ondelete='CASCADE'), primary_key=True)
+    otp_hash = db.Column(db.String(64), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    attempts = db.Column(db.Integer, default=0, nullable=False)

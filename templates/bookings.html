@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Demo Requests{% endblock %}
+
+{% block content %}
+<div class="app-container pt-6 pb-24 relative z-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6 fade-in">
+        <div>
+            <p class="section-label">Grow your tuition</p>
+            <h1 class="page-title mt-1">Demo Requests</h1>
+        </div>
+        {% if new_count %}
+        <span class="badge badge-pending"><i class="fas fa-bell"></i> {{ new_count }} new</span>
+        {% endif %}
+    </div>
+
+    <!-- Share link card -->
+    <div class="card-dark rounded-2xl p-5 mb-6" style="animation: slideUp 0.4s ease both; animation-delay: 0.1s;">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl icon-chip gradient-cyan"><i class="fas fa-link text-sm"></i></div>
+            <div class="flex-1">
+                <h3 class="font-semibold text-sm">Your public booking link</h3>
+                <p class="text-gray-500 text-xs">Share it on WhatsApp status, posters, or with parents — they can request a free demo class.</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <input type="text" id="bookingUrl" value="{{ booking_url }}" readonly
+                   class="input-dark rounded-xl text-xs flex-1" onclick="this.select()">
+            <button onclick="copyBookingLink()" class="btn-outline px-3.5 rounded-xl text-sm" title="Copy link">
+                <i class="fas fa-copy"></i>
+            </button>
+            <a href="https://wa.me/?text={{ ('Book a free demo class with me: ' ~ booking_url) | urlencode }}" target="_blank"
+               class="px-3.5 rounded-xl text-sm flex items-center" style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);" title="Share on WhatsApp">
+                <i class="fab fa-whatsapp"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Requests -->
+    {% if requests %}
+    <div class="space-y-3">
+        {% for r in requests %}
+        <div class="card-dark rounded-2xl p-4 {{ 'opacity-60' if r.status == 'closed' else '' }}"
+             style="animation: slideUp 0.4s ease both; animation-delay: {{ 0.15 + loop.index0 * 0.05 }}s;">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-xl icon-chip {{ 'gradient-orange' if r.status == 'new' else ('gradient-green' if r.status == 'contacted' else 'gradient-blue') }}">
+                    <i class="fas {{ 'fa-bell' if r.status == 'new' else ('fa-phone' if r.status == 'contacted' else 'fa-check') }} text-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-medium text-sm">{{ r.student_name }}
+                        {% if r.class_grade %}<span class="text-gray-500 text-xs">&bull; Class {{ r.class_grade }}</span>{% endif %}
+                    </div>
+                    <div class="text-gray-500 text-xs">
+                        {{ r.subject or 'Any subject' }}
+                        {% if r.preferred_day %} &bull; {{ r.preferred_day|capitalize }}{% endif %}
+                        {% if r.preferred_time %} at {{ r.preferred_time }}{% endif %}
+                    </div>
+                </div>
+                {% if r.parent_id %}
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold" style="background:var(--accent-tint);color:var(--accent-dark);" title="Came from teacher search">
+                    <i class="fas fa-search mr-0.5"></i>Search
+                </span>
+                {% endif %}
+                <span class="badge {{ 'badge-pending' if r.status == 'new' else ('badge-paid' if r.status == 'contacted' else '') }}"
+                      {% if r.status == 'closed' %}style="background:var(--bg-subtle);color:var(--text-muted);"{% endif %}>
+                    {{ r.status|capitalize }}
+                </span>
+            </div>
+            {% if r.parent_name or r.note %}
+            <p class="text-gray-500 text-xs mb-3 pl-1">
+                {% if r.parent_name %}<i class="fas fa-user mr-1"></i>{{ r.parent_name }}{% endif %}
+                {% if r.note %} &bull; "{{ r.note }}"{% endif %}
+            </p>
+            {% endif %}
+            <div class="flex items-center gap-2 pt-2 border-t border-white/5">
+                <span class="text-gray-600 text-[10px] flex-1">{{ r.created_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+                <a href="https://wa.me/91{{ r.phone }}?text={{ ('Namaste! Thanks for requesting a demo class for ' ~ r.student_name ~ '. When would be a good time to talk?') | urlencode }}"
+                   target="_blank" class="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                   style="background:var(--success-bg); color:var(--success); border:1px solid var(--success);">
+                    <i class="fab fa-whatsapp mr-1"></i>Reply
+                </a>
+                {% if r.status == 'new' %}
+                <form method="POST" action="{{ url_for('booking.update_booking_status', id=r.id) }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="status" value="contacted">
+                    <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold" style="background:var(--info-bg); color:var(--info); border:1px solid var(--info);">
+                        Mark Contacted
+                    </button>
+                </form>
+                {% endif %}
+                {% if r.status != 'closed' %}
+                <form method="POST" action="{{ url_for('booking.update_booking_status', id=r.id) }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="status" value="closed">
+                    <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold" style="background:var(--bg-subtle); color:var(--text-muted); border:1px solid var(--border-default);">
+                        Close
+                    </button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('booking.delete_booking', id=r.id) }}" class="inline"
+                      onsubmit="return confirm('Delete this request?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold btn-danger">Delete</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-dark rounded-2xl p-8 text-center" style="animation: slideUp 0.4s ease both; animation-delay: 0.15s;">
+        <i class="fas fa-inbox text-3xl text-gray-600 mb-3"></i>
+        <p class="text-gray-400 font-medium mb-1">No demo requests yet</p>
+        <p class="text-gray-600 text-sm">Share your booking link to start getting new students</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block nav %}
+{% include "components/sidebar.html" %}
+{% include "components/bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyBookingLink() {
+    var input = document.getElementById('bookingUrl');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(function() {
+        showToast('Booking link copied!');
+    }).catch(function() {
+        document.execCommand('copy');
+        showToast('Booking link copied!');
+    });
+}
+</script>
+{% endblock %}
