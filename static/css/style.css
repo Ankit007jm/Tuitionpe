@@ -541,23 +541,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
-/* Scroll reveal */
-[data-sr] {
-    opacity: 0; transform: translateY(18px);
-    transition: opacity 0.55s var(--ease-out), transform 0.55s var(--ease-out);
-}
-[data-sr].sr-in { opacity: 1; transform: translateY(0); }
-.sidebar [data-sr] { opacity: 1; transform: none; transition: none; }
-
-/* Text mask reveal */
-.reveal-clip { display: inline-block; overflow: hidden; vertical-align: bottom; line-height: 1.2; }
-.reveal-clip-inner {
-    display: inline-block; transform: translateY(105%);
-    transition: transform 0.7s var(--ease-out);
-    transition-delay: var(--reveal-delay, 0s);
-}
-.reveal-clip-inner.revealed { transform: translateY(0); }
-
 /* Stagger helpers */
 .stagger-1 { transition-delay: 0.05s !important; }
 .stagger-2 { transition-delay: 0.10s !important; }
@@ -575,8 +558,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-    [data-sr] { opacity: 1; transform: none; }
-    .reveal-clip-inner { transform: none; }
 }
 
 /* ============= DESKTOP GRID LAYOUTS ============= */

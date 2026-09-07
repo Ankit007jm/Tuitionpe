@@ -6,8 +6,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-6 fade-in">
         <div>
-            <p class="text-gray-500 text-sm">My Students</p>
-            <h1 class="text-2xl font-bold mt-1">Students</h1>
+            <h1 class="page-title">Students</h1>
         </div>
         <a href="{{ url_for('students.add_student') }}" class="btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold">
             <i class="fas fa-plus mr-1"></i> Add
@@ -77,7 +76,7 @@
             </div>
             <div class="flex items-center justify-between pt-3 border-t border-white/5">
                 <div class="text-sm">
-                    <span class="font-semibold" style="background:linear-gradient(120deg,var(--accent-dark),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">₹{{ s.fee_amount|int }}</span>
+                    <span class="font-semibold">₹{{ s.fee_amount|int }}</span>
                     <span class="text-gray-500">/{{ s.payment_cycle }}</span>
                     {% if item.att_pct is not none %}
                     {% set att_color = 'var(--success)' if item.att_pct >= 90 else ('var(--warning)' if item.att_pct >= 75 else 'var(--danger)') %}

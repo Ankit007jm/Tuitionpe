@@ -6,10 +6,8 @@
     <!-- Header with greeting -->
     <div class="flex items-center justify-between mb-8 fade-in">
         <div>
-            <p class="section-label">Welcome back</p>
-            <h1 class="page-title mt-1">
-                Hello, <span class="text-gradient-accent">{{ current_user.name.split()[0] }}</span>
-            </h1>
+            <h1 class="page-title">Hello, {{ current_user.name.split()[0] }}</h1>
+            <p class="text-gray-500 text-sm mt-1">{{ today_display }}</p>
         </div>
         <div class="w-11 h-11 gradient-accent rounded-xl flex items-center justify-center text-sm font-bold avatar">
             {{ current_user.name.split()[0][0]|upper }}{{ current_user.name.split()[1][0]|upper if current_user.name.split()|length > 1 else '' }}
@@ -25,7 +23,7 @@
         </div>
         <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold">{{ new_demo_requests }} new demo request{{ 's' if new_demo_requests > 1 else '' }}</p>
-            <p class="text-gray-500 text-xs">Parents are waiting to hear from you</p>
+            <p class="text-gray-500 text-xs">Tap to see the details and reply</p>
         </div>
         <i class="fas fa-chevron-right text-gray-600 text-xs flex-shrink-0"></i>
     </a>
@@ -111,8 +109,8 @@
             </div>
             {% else %}
             <div class="text-center py-4">
-                <p class="text-gray-500 text-xs italic">"{{ quotes.active_students }}"</p>
-                <a href="{{ url_for('students.add_student') }}" class="text-accent text-xs font-medium mt-2 inline-block hover:underline">+ Add your first student</a>
+                <p class="text-gray-500 text-xs mb-2">No students added yet.</p>
+                <a href="{{ url_for('students.add_student') }}" class="text-accent text-xs font-medium hover:underline">Add your first student</a>
             </div>
             {% endif %}
         </div>
@@ -147,8 +145,8 @@
             </div>
             {% else %}
             <div class="text-center py-4">
-                <i class="fas fa-umbrella-beach text-2xl text-gray-700 mb-2"></i>
-                <p class="text-gray-500 text-xs italic">"{{ quotes.today_classes }}"</p>
+                <p class="text-gray-500 text-xs mb-2">Nothing scheduled for today.</p>
+                <a href="{{ url_for('schedule.schedule') }}" class="text-accent text-xs font-medium hover:underline">Add a class</a>
             </div>
             {% endif %}
         </div>
@@ -178,9 +176,10 @@
             </div>
             {% else %}
             <div class="text-center py-4">
-                <i class="fas fa-trophy text-2xl text-emerald-700 mb-2"></i>
-                <p class="text-emerald-500 text-xs font-medium mb-1">All fees collected!</p>
-                <p class="text-gray-500 text-xs italic">"{{ quotes.pending_fees }}"</p>
+                <p class="text-emerald-500 text-xs font-semibold mb-1">
+                    <i class="fas fa-check-circle mr-1"></i>All fees collected
+                </p>
+                <p class="text-gray-500 text-xs">Nothing pending for this month.</p>
             </div>
             {% endif %}
         </div>
@@ -210,7 +209,7 @@
             </div>
             {% else %}
             <div class="text-center py-4">
-                <p class="text-gray-500 text-xs italic">"{{ quotes.collected_fees }}"</p>
+                <p class="text-gray-500 text-xs">No payments recorded this month.</p>
             </div>
             {% endif %}
         </div>
@@ -234,7 +233,7 @@
                 <h3 class="font-semibold text-sm flex items-center gap-2">
                     <i class="fas fa-bullseye text-accent text-xs"></i> Monthly Collection
                 </h3>
-                <span class="text-sm font-bold text-gradient-accent">{{ progress }}%</span>
+                <span class="text-sm font-bold">{{ progress }}%</span>
             </div>
             <div class="w-full rounded-full h-3 overflow-hidden mb-2 progress-track">
                 <div class="progress-bar rounded-full" style="width: {{ progress }}%"></div>
@@ -263,7 +262,7 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-gray-600 text-xs text-center py-2 italic">"{{ quotes.collected_fees }}"</p>
+                <p class="text-gray-600 text-xs text-center py-2">No payments yet this month.</p>
                 {% endif %}
             </div>
         </div>
@@ -312,9 +311,9 @@
         </div>
         {% else %}
         <div class="card-dark rounded-2xl p-6 text-center">
-            <i class="fas fa-coffee text-2xl text-gray-600 mb-2"></i>
             <p class="text-gray-400 text-sm font-medium mb-1">No classes today</p>
-            <p class="text-gray-600 text-xs italic">"{{ quotes.today_classes }}"</p>
+            <p class="text-gray-600 text-xs mb-3">Your weekly timetable decides what shows up here.</p>
+            <a href="{{ url_for('schedule.schedule') }}" class="btn-outline px-4 py-2 rounded-xl text-xs">Open schedule</a>
         </div>
         {% endif %}
     </div>

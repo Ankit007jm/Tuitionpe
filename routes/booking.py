@@ -53,7 +53,7 @@ def notify_tutor_new_request(tutor, req, source='booking link'):
            Reply on WhatsApp</a>
         <a href="{bookings_url}" style="display:inline-block;margin-top:16px;margin-left:8px;color:#0d9488;
            text-decoration:none;padding:11px 8px;font-size:13px;">View all requests</a>
-        <p style="color:#a3b0ac;font-size:11px;margin-top:18px;">Respond fast — parents usually pick the first teacher who replies.</p>
+        <p style="color:#a3b0ac;font-size:11px;margin-top:18px;">You are receiving this because demo requests are enabled on your TuitionPe account.</p>
       </div>
     </div>"""
 

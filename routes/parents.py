@@ -150,7 +150,7 @@ def request_demo(tutor_id):
     db.session.commit()
     _record(client_ip, 'demo')
     notify_tutor_new_request(tutor, req, source='TuitionPe teacher search')
-    flash(f'Demo request sent to {tutor.name}! You can chat with them right away.', 'success')
+    flash(f'Request sent to {tutor.name}. You can message them from here.', 'success')
     return redirect(url_for('parents.parent_home'))
 
 
@@ -196,7 +196,7 @@ def parent_signup():
         db.session.commit()
         _record(client_ip, 'signup')
         session['parent_id'] = parent.id
-        flash(f'Welcome, {name.split()[0]}! Find your perfect teacher below.', 'success')
+        flash(f'Account created. Welcome, {name.split()[0]}.', 'success')
         return redirect(_safe_next('/find'))
     return render_template('parents/signup.html', next=_safe_next('/find'))
 
@@ -275,5 +275,5 @@ def submit_review(parent, request_id):
             demo_request_id=req.id, rating=rating, comment=comment,
         ))
     db.session.commit()
-    flash('Thanks for rating! Your review helps other parents choose.', 'success')
+    flash('Thanks, your rating has been saved.', 'success')
     return redirect(url_for('parents.parent_home'))

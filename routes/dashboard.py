@@ -3,7 +3,6 @@ from flask_login import login_required, current_user
 from models import db, Student, Schedule, Payment, Attendance, DemoRequest
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
-import random
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -117,38 +116,6 @@ def get_today_classes(tutor_id):
     return classes
 
 
-MOTIVATIONAL_QUOTES = {
-    'active_students': [
-        "Every student is a seed of potential — you're the gardener.",
-        "Teaching is the one profession that creates all other professions.",
-        "Great teachers don't just teach, they inspire.",
-        "A good teacher can change the trajectory of a life.",
-        "Your impact as a teacher reaches far beyond the classroom.",
-    ],
-    'today_classes': [
-        "Today is a blank page. Write a good one.",
-        "Every class is a chance to make a difference.",
-        "The best teachers teach from the heart, not from the book.",
-        "Today's preparation determines tomorrow's achievement.",
-        "Each lesson planted today will bloom in the future.",
-    ],
-    'pending_fees': [
-        "Stay consistent. Success follows persistence.",
-        "Financial discipline is the backbone of a great tuition business.",
-        "Every pending payment is a relationship to nurture.",
-        "Gentle reminders work wonders. Keep going!",
-        "A well-managed fee system builds trust with parents.",
-    ],
-    'collected_fees': [
-        "Your hard work is paying off — literally!",
-        "Consistency in collection reflects consistency in quality.",
-        "Financial growth is a sign of a thriving tuition practice.",
-        "Well done! Every rupee collected fuels your passion.",
-        "Celebrate the small wins — they add up to big success.",
-    ]
-}
-
-
 def get_active_students_detail(tutor_id):
     """Get detailed list of active students for dashboard card."""
     students = Student.query.filter_by(tutor_id=tutor_id, status='active')\
@@ -241,22 +208,19 @@ def dashboard():
     collected_fees_detail = get_collected_fees_detail(current_user.id)
     recent_payments = get_recent_payments(current_user.id)
 
-    # Motivational quotes for each card
-    quotes = {k: random.choice(v) for k, v in MOTIVATIONAL_QUOTES.items()}
-
     # New demo-class requests (from the public booking link)
     new_demo_requests = DemoRequest.query.filter_by(
         tutor_id=current_user.id, status='new').count()
 
     return render_template('dashboard.html',
         stats=stats, chart_data=chart_data,
+        today_display=date.today().strftime('%A, %d %B'),
         today_classes=today_classes, progress=progress,
         active_students_detail=active_students_detail,
         pending_fees_detail=pending_fees_detail,
         collected_fees_detail=collected_fees_detail,
         recent_payments=recent_payments,
-        new_demo_requests=new_demo_requests,
-        quotes=quotes)
+        new_demo_requests=new_demo_requests)
 
 @dashboard_bp.route('/api/stats')
 @login_required

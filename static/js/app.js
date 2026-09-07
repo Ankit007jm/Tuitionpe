@@ -69,103 +69,11 @@ function closeComingSoon() {
 }
 
 // ========== SIGNUP WIZARD ==========
-let currentSignupStep = 1;
-
-function goToSignupStep(step) {
-    const step1 = document.getElementById('signupStep1');
-    const step2 = document.getElementById('signupStep2');
-    const step3 = document.getElementById('signupStep3');
-
-    // Validate current step before moving forward
-    if (currentSignupStep === 1 && step > 1) {
-        const name = document.getElementById('signupName');
-        const phone = document.getElementById('signupPhone');
-        const password = document.getElementById('signupPass');
-        const confirm = document.getElementById('signupConfirmPass');
-
-        if (!name || !name.value.trim() || name.value.trim().length < 2) {
-            showToast('Name must be at least 2 characters.', 'error');
-            return;
-        }
-        if (!phone || phone.value.length !== 10) {
-            showToast('Enter a valid 10-digit phone number.', 'error');
-            return;
-        }
-        if (!password || password.value.length < 6) {
-            showToast('Password must be at least 6 characters.', 'error');
-            return;
-        }
-        if (!confirm || password.value !== confirm.value) {
-            showToast('Passwords do not match.', 'error');
-            return;
-        }
-    }
-
-    if (currentSignupStep === 2 && step > 2) {
-        const checked = document.querySelectorAll('input[name="subjects"]:checked');
-        if (checked.length === 0) {
-            showToast('Please select at least one subject.', 'error');
-            return;
-        }
-    }
-
-    // Hide all steps
-    if (step1) step1.style.display = 'none';
-    if (step2) step2.style.display = 'none';
-    if (step3) step3.style.display = 'none';
-
-    // Show target step
-    const target = document.getElementById('signupStep' + step);
-    if (target) target.style.display = 'block';
-
-    currentSignupStep = step;
-    updateSignupStepIndicators();
-}
-
-function updateSignupStepIndicators() {
-    for (let i = 1; i <= 3; i++) {
-        const indicator = document.getElementById('step' + i + 'Indicator');
-        const label = document.getElementById('step' + i + 'Label');
-
-        if (!indicator) continue;
-
-        indicator.className = '';
-        if (i < currentSignupStep) {
-            indicator.classList.add('w-9', 'h-9', 'rounded-full', 'gradient-accent', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-bold', 'transition-all');
-            indicator.innerHTML = '<i class="fas fa-check text-xs"></i>';
-        } else if (i === currentSignupStep) {
-            indicator.classList.add('w-9', 'h-9', 'rounded-full', 'gradient-accent', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-bold', 'transition-all');
-            indicator.textContent = i;
-        } else {
-            indicator.classList.add('w-9', 'h-9', 'rounded-full', 'bg-white/10', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-bold', 'text-gray-500', 'transition-all');
-            indicator.textContent = i;
-        }
-
-        if (label) {
-            label.style.color = i <= currentSignupStep ? 'var(--accent-dark)' : 'var(--text-muted)';
-        }
-    }
-}
-
-function handleSignup(event) {
-    event.preventDefault();
-    const form = document.getElementById('signupForm');
-    if (form) {
-        const subjects = [];
-        document.querySelectorAll('input[name="subjects"]:checked').forEach(cb => {
-            subjects.push(cb.value);
-        });
-        document.getElementById('subjectsHidden').value = subjects.join(',');
-
-        const classes = [];
-        document.querySelectorAll('input[name="classes"]:checked').forEach(cb => {
-            classes.push(cb.value);
-        });
-        document.getElementById('classesHidden').value = classes.join(',');
-
-        form.submit();
-    }
-}
+// The signup wizard lives in templates/auth/signup.html, which is the only
+// page that uses it. It was duplicated here too, and because both copies
+// declared `let currentSignupStep`, whichever script parsed second threw a
+// SyntaxError — on /signup that was this file, so every helper below
+// (showToast, togglePass, ripples...) silently failed to load on the signup page.
 
 // ========== WHATSAPP ==========
 function sendWhatsAppReminder(phone, studentName, amount, month, tutorName, isOverdue) {
@@ -309,83 +217,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// ========== MILKINSIDE-STYLE ANIMATIONS ==========
+// ========== INTERACTION POLISH ==========
+//
+// Navigation is deliberately instant: an earlier version faded the page
+// out for 180ms on every link click, which (a) delayed every navigation
+// and (b) broke the browser Back button — the browser restores a page
+// from its back/forward cache with inline styles intact, so pages came
+// back stuck at opacity:0 (blank screen). DOMContentLoaded does not fire
+// on a bfcache restore, so nothing reset it.
 
-// 1. Custom cursor — disabled (default cursor restored)
-
-// 2. Scroll-triggered reveal via IntersectionObserver
-function initScrollReveal() {
-    const SKIP = '.sidebar, .bottom-nav, .loading-screen, .toast, .modal-overlay, [data-sr-skip]';
-
-    // Auto-tag revelable elements that aren't already tagged
-    const targets = document.querySelectorAll('.card-dark, .stat-card, .flash-message');
-    targets.forEach((el, i) => {
-        if (el.closest(SKIP) || el.hasAttribute('data-sr')) return;
-        el.setAttribute('data-sr', '');
-        // Stagger within siblings — use index mod 6 for variety
-        el.style.transitionDelay = (i % 6) * 0.07 + 's';
-    });
-
-    const observer = new IntersectionObserver(entries => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('sr-in');
-                observer.unobserve(entry.target);
-            }
-        });
-    }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
-
-    document.querySelectorAll('[data-sr]').forEach(el => {
-        if (!el.closest(SKIP)) observer.observe(el);
-    });
-}
-
-// 3. Text mask reveal — word-by-word slide-up for h1 elements
-function initTextReveal() {
-    document.querySelectorAll('h1').forEach(el => {
-        // Skip if already processed or contains child elements with structure
-        if (el.dataset.trDone || el.querySelector('span, a, i')) return;
-        el.dataset.trDone = '1';
-
-        const text = el.textContent.trim();
-        if (!text) return;
-        const words = text.split(/\s+/);
-        el.innerHTML = words.map((w, i) =>
-            `<span class="reveal-clip" style="margin-right:0.25em"><span class="reveal-clip-inner" style="--reveal-delay:${i * 0.08}s">${w}</span></span>`
-        ).join('');
-
-        requestAnimationFrame(() => setTimeout(() => {
-            el.querySelectorAll('.reveal-clip-inner').forEach(s => s.classList.add('revealed'));
-        }, 120));
-    });
-}
-
-// 4. Soft page fade transition — gentle opacity fade, no overlay
-function initPageTransition() {
-    // Entrance: ensure page starts at full opacity (in case browser cached an exit state)
+// Safety net: clear any leftover fade from a cached page (including
+// pages cached by the previous version of this script). `pageshow` fires
+// on first load AND on back/forward cache restores.
+window.addEventListener('pageshow', () => {
     document.body.style.opacity = '';
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.body.style.transition = '';
+});
 
-    let navigating = false;
-    document.addEventListener('click', e => {
-        if (navigating) return;
-        const link = e.target.closest('a[href]');
-        if (!link) return;
-        const href = link.getAttribute('href');
-        if (!href || href.startsWith('#') || href.startsWith('http') ||
-            link.target === '_blank' || href.startsWith('mailto') ||
-            href.startsWith('tel') || href.startsWith('whatsapp')) return;
-        if (link.dataset.noFade !== undefined) return;
-
-        e.preventDefault();
-        navigating = true;
-        document.body.style.transition = 'opacity 0.18s ease';
-        document.body.style.opacity = '0';
-        setTimeout(() => { window.location.href = href; }, 180);
-    });
-}
-
-// 5. Click ripple on buttons
+// Click ripple on buttons
 function initRipples() {
     document.addEventListener('click', e => {
         const btn = e.target.closest('.btn-primary, .btn-outline');
@@ -402,7 +251,7 @@ function initRipples() {
     });
 }
 
-// 6. Animate progress bars from 0 to their target width on load
+// Animate progress bars from 0 to their target width on load
 function initProgressBars() {
     document.querySelectorAll('.progress-bar').forEach(bar => {
         const target = bar.style.width;
@@ -412,14 +261,9 @@ function initProgressBars() {
     });
 }
 
-// Boot all animations
 document.addEventListener('DOMContentLoaded', () => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduced) {
-        initScrollReveal();
-        initTextReveal();
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         initRipples();
         initProgressBars();
     }
-    initPageTransition();
 });

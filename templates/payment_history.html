@@ -42,7 +42,7 @@
                 <div class="font-medium">{{ student.student_name }}</div>
                 <div class="text-gray-500 text-xs">Class {{ student.class_grade }} &bull; {{ student.subject }}</div>
                 <div class="text-gray-500 text-xs">
-                    <span class="font-semibold" style="background:linear-gradient(120deg,var(--accent-dark),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">₹{{ student.fee_amount|int }}</span>/{{ student.payment_cycle }}
+                    <span class="font-semibold">₹{{ student.fee_amount|int }}</span>/{{ student.payment_cycle }}
                     {% if student.date_of_joining %}
                     &bull; Joined {{ student.date_of_joining.strftime('%d %b %Y') }}
                     {% endif %}

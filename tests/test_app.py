@@ -603,7 +603,7 @@ class TestMarketplace(BaseCase):
     def test_find_page_public(self):
         r = self.client.get('/find')
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b'Find your perfect teacher', r.data)
+        self.assertIn(b'Find a tutor', r.data)
 
     def test_only_discoverable_tutors_listed(self):
         r = self.client.get('/find')
@@ -636,7 +636,7 @@ class TestMarketplace(BaseCase):
             'phone': self.PARENT['phone'], 'password': self.PARENT['password'],
             'csrf_token': token,
         }, follow_redirects=True)
-        self.assertIn(b'My Demo Requests', r.data)
+        self.assertIn(b'My demo requests', r.data)
 
     def test_parent_login_wrong_password(self):
         self._signup_parent(phone='9500000002')
@@ -677,7 +677,7 @@ class TestMarketplace(BaseCase):
         r = self.client.post(f"/find/request/{self.ids['tutor1']}", data={
             'subject': 'Mathematics', 'csrf_token': token,
         }, follow_redirects=True)
-        self.assertIn(b'Demo request sent', r.data)
+        self.assertIn(b'Request sent to', r.data)
         with app.app_context():
             req = DemoRequest.query.filter_by(phone='9500000004').first()
             self.assertIsNotNone(req)
@@ -787,7 +787,7 @@ class TestLandingAndReviews(BaseCase):
         r = self.client.post(f'/parent/review/{rid}', data={
             'rating': '5', 'comment': 'Great teacher!', 'csrf_token': token,
         }, follow_redirects=True)
-        self.assertIn(b'Thanks for rating', r.data)
+        self.assertIn(b'rating has been saved', r.data)
         with app.app_context():
             rv = Review.query.filter_by(demo_request_id=rid).first()
             self.assertEqual(rv.rating, 5)
@@ -844,7 +844,7 @@ class TestLandingAndReviews(BaseCase):
         r = self.client.post(f"/find/request/{self.ids['tutor1']}", data={
             'csrf_token': get_csrf(self.client),
         }, follow_redirects=True)
-        self.assertIn(b'Demo request sent', r.data)
+        self.assertIn(b'Request sent to', r.data)
 
 
 if __name__ == '__main__':

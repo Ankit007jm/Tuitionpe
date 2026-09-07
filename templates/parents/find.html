@@ -6,10 +6,9 @@
 
 <div class="max-w-5xl mx-auto px-4 pb-20 relative z-10">
     <!-- Hero -->
-    <div class="text-center pt-10 pb-8">
-        <p class="section-label mb-3">Teachers near you, fast</p>
-        <h1 class="page-title mb-3">Find your perfect teacher<br><span class="text-gradient-accent">in minutes, not weeks</span></h1>
-        <p class="text-gray-500 text-sm max-w-md mx-auto">Search verified tutors by subject and class, book a free demo, and chat on WhatsApp — all in one place.</p>
+    <div class="pt-10 pb-6">
+        <h1 class="page-title mb-2">Find a tutor</h1>
+        <p class="text-gray-500 text-sm">Search by subject, class or city, then request a free demo class.</p>
     </div>
 
     <!-- Search / Filters -->
@@ -107,7 +106,7 @@
 
             {% if parent and t.id in requested_ids %}
             <a href="{{ url_for('parents.parent_home') }}" class="w-full btn-outline py-2.5 rounded-xl text-sm block text-center">
-                <i class="fas fa-check mr-1" style="color:var(--success);"></i> Demo requested — view status
+                <i class="fas fa-check mr-1" style="color:var(--success);"></i> Demo requested. View status
             </a>
             {% else %}
             <form method="POST" action="{{ url_for('parents.request_demo', tutor_id=t.id) }}" class="flex gap-2">
@@ -120,7 +119,7 @@
                 <input type="hidden" name="subject" value="{{ subject_list[0].strip() if subject_list else '' }}">
                 {% endif %}
                 <button type="submit" class="btn-primary py-2.5 px-4 rounded-xl text-sm flex-1">
-                    <i class="fas fa-bolt"></i> Book free demo
+                    Request demo class
                 </button>
             </form>
             {% endif %}
@@ -138,7 +137,7 @@
 
     <!-- Tutor CTA -->
     <div class="text-center mt-10">
-        <p class="text-gray-600 text-xs">Are you a teacher? <a href="{{ url_for('auth.login') }}" class="text-accent font-semibold hover:underline">Join TuitionPe</a> and get discovered by parents.</p>
+        <p class="text-gray-600 text-xs">Are you a teacher? <a href="{{ url_for('auth.login') }}" class="text-accent font-semibold hover:underline">List yourself here</a>.</p>
     </div>
 </div>
 {% endblock %}
